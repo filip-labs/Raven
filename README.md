@@ -10,10 +10,11 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - A dataset-neutral `PointCloud` model with validated finite XYZ/intensity values and a read-only array copy.
 - Spatial range filtering that preserves intensity and frame metadata.
 - The `raven inspect` CLI for frame summaries.
+- Validated detection/ground-truth boxes and KITTI `label_2` parsing with source metadata.
 - An optional interactive Open3D viewer with distance, intensity, and uniform coloring.
 - Automated unit tests and CPU-only Python CI.
 
-PointPillars inference, object detection, GPU processing, KITTI annotation parsing, calibration transforms, and scientific benchmarking are planned. The existing detection data model and protocol only define an interface; no detection backend is implemented. No inference results or release are available.
+PointPillars inference, object detection, GPU processing, calibration transforms, and scientific benchmarking are planned. The detection models and protocol define the backend interface; no detection backend is implemented. No inference results or release are available.
 
 ## Installation
 
@@ -43,6 +44,26 @@ raven inspect data/kitti/training/velodyne/000000.bin
 ```
 
 The command prints JSON containing the frame ID, coordinate frame, point count, and minimum/maximum XYZ bounds in the source sensor frame. Empty frames report null bounds. It does not run inference or display a 3D scene.
+
+## KITTI annotation inspection
+
+```bash
+raven inspect-labels data/kitti/training/label_2/000000.txt
+```
+
+The JSON summary reports the frame, object count, counts by class, ignored-region
+count, unknown classes, and `kitti_rectified_camera` coordinate frame. No Open3D
+or graphical display is required. Empty files produce zero counts.
+
+Annotations retain KITTI's **bottom-center** camera position, dimensions in
+height/width/length order, and rotation about camera Y. The associated ground-truth
+box explicitly stores `position_reference="bottom_center"`, `rotation_axis="y"`,
+and dimensions reordered to length/width/height. It does not shift positions,
+convert to LiDAR, or reinterpret camera rotation as LiDAR yaw. `DontCare` records
+remain ignore metadata without a valid 3D box; unknown classes are preserved.
+
+See [annotation format and model conventions](docs/kitti-annotations.md) for the
+reusable API, validation rules, optional score handling, and current limitations.
 
 ## Interactive visualization
 
