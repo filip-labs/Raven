@@ -39,6 +39,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     visualize = sub.add_parser("visualize", help="Explore a KITTI LiDAR frame in an Open3D window")
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
+        "--ground-truth", action="store_true", help="Display matching KITTI ground-truth boxes"
+    )
+    visualize.add_argument("--labels", help="Explicit label_2 file (requires --ground-truth)")
+    visualize.add_argument("--calib", help="Explicit calibration file (requires --ground-truth)")
+    visualize.add_argument(
         "--color",
         choices=("distance", "intensity", "uniform"),
         default="distance",
@@ -51,6 +56,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="Point size in pixels, from 1 to 25 (default: 2)",
     )
     args = parser.parse_args(argv)
+    if args.command == "visualize" and (args.labels or args.calib) and not args.ground_truth:
+        parser.error("--labels and --calib require --ground-truth")
     try:
         if args.command == "inspect-calib":
             import numpy as np
@@ -102,6 +109,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         if args.command == "visualize":
             from raven.perception.visualization.viewer import view_point_cloud
 
+            if args.ground_truth:
+                from raven.perception.visualization.boxes import load_ground_truth_boxes
+
+                boxes = load_ground_truth_boxes(
+                    args.path, labels_path=args.labels, calibration_path=args.calib
+                )
+                view_point_cloud(cloud, color=args.color, point_size=args.point_size, boxes=boxes)
+                return
             view_point_cloud(cloud, color=args.color, point_size=args.point_size)
             return
     except (OSError, ValueError, RuntimeError) as exc:

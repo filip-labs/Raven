@@ -145,3 +145,27 @@ def test_real_local_kitti_coloring_smoke():
         assert colors.shape == (cloud.count, 3)
         assert np.isfinite(colors).all()
         assert ((colors >= 0) & (colors <= 1)).all()
+
+
+@pytest.mark.parametrize("mode", COLOR_MODES)
+def test_viewer_batches_box_wireframes_and_preserves_point_colors(renderer, mode):
+    from raven.perception.data.kitti_annotations import parse_kitti_annotation
+    from raven.perception.data.kitti_calibration import KittiCalibration, transform_annotation
+
+    fake, geometry, _, _, visualizer = renderer
+    wireframe = SimpleNamespace()
+    fake.geometry.LineSet = Mock(return_value=wireframe)
+    fake.utility.Vector2iVector = lambda values: np.array(values, copy=True)
+    calib = KittiCalibration({"R0_rect": np.eye(3), "Tr_velo_to_cam": np.eye(4)[:3]})
+    annotation = parse_kitti_annotation("Pedestrian 0 0 0 10 20 100 200 2 1 1 1 2 10 0")
+    box = transform_annotation(annotation, calib)
+    cloud = PointCloud(np.array([[1, 2, 3, 0.5]]), "000000", "kitti_velodyne")
+    view_point_cloud(cloud, color=mode, boxes=[box])
+    np.testing.assert_allclose(geometry.colors, point_colors(cloud, mode) * 0.35)
+    np.testing.assert_array_equal(wireframe.points, box.corners)
+    assert wireframe.lines.shape == (12, 2)
+    np.testing.assert_array_equal(wireframe.colors, [[1, 0, 0]] * 12)
+    assert visualizer.add_geometry.call_args_list[-1].args == (wireframe,)
+    assert visualizer.add_geometry.call_args_list[-1].kwargs == {"reset_bounding_box": False}
+    visualizer.run.assert_called_once()
+    visualizer.destroy_window.assert_called_once()
