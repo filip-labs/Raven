@@ -12,7 +12,7 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - The `raven inspect` CLI for frame summaries.
 - KITTI calibration parsing and reversible point/full-pose box transformations.
 - Validated detection/ground-truth boxes and KITTI `label_2` parsing with source metadata.
-- An optional interactive Open3D viewer with distance, intensity, and uniform coloring.
+- An optional interactive Open3D viewer with selectable point coloring and calibrated KITTI ground-truth wireframes.
 - Automated unit tests and CPU-only Python CI.
 
 A user-verified Kaggle experiment executed pretrained PointPillars inference on
@@ -86,8 +86,8 @@ raven inspect-calib data/kitti/training/calib/000000.txt
 Calibration parsing and point/box conversions use NumPy, without Open3D or a GUI.
 The command reports available matrix shapes, the Velodyne-to-rectified-camera
 homogeneous transform, frame names, and invertibility. Transformed box geometry
-preserves all three orientation axes and source metadata; bounding-box rendering
-is not implemented. The existing annotation frame name `kitti_rectified_camera`
+preserves all three orientation axes and source metadata. The viewer can display
+this geometry with `--ground-truth`. The existing annotation frame name `kitti_rectified_camera`
 is accepted as an alias for `kitti_camera_rect`, without changing source records.
 
 See [calibration and transform conventions](docs/kitti-calibration.md) for the
@@ -101,6 +101,8 @@ With the visualization extra installed, run:
 raven visualize data/kitti/training/velodyne/000000.bin
 raven visualize data/kitti/training/velodyne/000000.bin --color intensity
 raven visualize data/kitti/training/velodyne/000000.bin --color uniform --point-size 3.0
+raven visualize data/kitti/training/velodyne/000000.bin --ground-truth
+raven visualize data/kitti/training/velodyne/000001.bin --ground-truth --color uniform
 raven visualize --help
 ```
 
@@ -115,6 +117,20 @@ origin and includes the frame ID and coordinate frame in the window title.
   Constant intensities retain their brightness without normalization or division.
 - **Uniform:** neutral gray for every point.
 
+With `--ground-truth`, the viewer loads matching sibling `label_2/FRAME.txt` and
+`calib/FRAME.txt` files, transforms camera bottom-center boxes into the cloud's
+Velodyne frame, and draws their full-orientation corners with twelve edges each.
+Car is green, Pedestrian red, Cyclist blue, and all other classes yellow.
+`DontCare` regions are skipped. Point colors are dimmed to 35% when boxes are
+present so saturated box wires remain distinguishable. Without boxes, existing
+point coloring is unchanged.
+
+For nonstandard layouts, supply both `--labels PATH` and `--calib PATH` together
+with `--ground-truth`. Scan, label, and calibration filename stems must match;
+missing files or mismatches produce errors before opening a window. See the
+[visualization guide](docs/visualization.md) for explicit-path examples and the
+reusable wireframe API. These boxes are dataset ground truth, not model predictions.
+
 Coloring does not alter the original XYZ, intensity, or coordinate metadata.
 Open3D is imported only when a nonempty cloud is displayed; help, inspection, and
 unit tests work without it. Missing dependencies, invalid files, empty clouds,
@@ -123,8 +139,8 @@ and failed window creation produce CLI errors. Empty frames remain valid for
 
 This is a single-frame desktop viewer requiring a graphical session and OpenGL.
 Headless rendering is not supported. Rendering requires Open3D geometry and RGB
-buffers in addition to the original cloud. Detection, bounding boxes, ground-truth
-overlays, and frame navigation are not implemented. Use the window close control
+buffers in addition to the original cloud. Detection, model prediction overlays,
+confidence styling, and frame navigation are not implemented. Use the window close control
 to finish the command; Open3D's built-in navigation controls are not customized.
 
 ## Testing

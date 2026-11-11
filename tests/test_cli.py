@@ -131,3 +131,52 @@ def test_visualize_reports_optional_dependency(frame, monkeypatch, capsys):
         main(["visualize", str(frame)])
     assert exc.value.code == 2
     assert "visualization" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("option", ["--labels", "--calib"])
+def test_explicit_ground_truth_paths_require_flag(frame, option, capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["visualize", str(frame), option, "000000.txt"])
+    assert exc.value.code == 2
+    assert "require --ground-truth" in capsys.readouterr().err
+
+
+def test_ground_truth_cli_explicit_paths_preserves_options(frame, tmp_path, monkeypatch):
+    labels = tmp_path / "labels/000000.txt"
+    calib = tmp_path / "calib/000000.txt"
+    labels.parent.mkdir()
+    calib.parent.mkdir()
+    labels.write_text("Pedestrian 0 0 0 10 20 100 200 2 1 1 1 2 10 0")
+    calib.write_text("R0_rect: 1 0 0 0 1 0 0 0 1\nTr_velo_to_cam: 0 -1 0 0 0 0 -1 0 1 0 0 0")
+    render = Mock()
+    monkeypatch.setattr(viewer, "view_point_cloud", render)
+    main(
+        [
+            "visualize",
+            str(frame),
+            "--ground-truth",
+            "--labels",
+            str(labels),
+            "--calib",
+            str(calib),
+            "--color",
+            "intensity",
+            "--point-size",
+            "3.5",
+        ]
+    )
+    assert render.call_args.kwargs["color"] == "intensity"
+    assert render.call_args.kwargs["point_size"] == 3.5
+    boxes = render.call_args.kwargs["boxes"]
+    assert len(boxes) == 1 and boxes[0].label == "Pedestrian"
+    assert boxes[0].coordinate_frame == render.call_args.args[0].coordinate_frame
+
+
+def test_ground_truth_cli_error_does_not_render(frame, monkeypatch, capsys):
+    render = Mock()
+    monkeypatch.setattr(viewer, "view_point_cloud", render)
+    with pytest.raises(SystemExit) as exc:
+        main(["visualize", str(frame), "--ground-truth"])
+    assert exc.value.code == 2
+    assert "nonstandard layouts" in capsys.readouterr().err
+    render.assert_not_called()
