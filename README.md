@@ -15,7 +15,14 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - An optional interactive Open3D viewer with distance, intensity, and uniform coloring.
 - Automated unit tests and CPU-only Python CI.
 
-PointPillars inference, object detection, GPU processing and scientific benchmarking are planned. The detection models and protocol define the backend interface; no detection backend is implemented. No inference results or release are available.
+A user-verified Kaggle experiment executed pretrained PointPillars inference on
+real KITTI data: 29 predictions from frame 000000. This demonstrates external GPU
+feasibility, not measured accuracy or an implemented Raven inference adapter.
+See [PointPillars feasibility and reproduction](docs/pointpillars-feasibility.md)
+for the reported environment, independently checked input/checkpoint hashes, and
+remaining reproduction gaps. The new headless experiment runner has CPU-tested
+validation/serialization but has not been rerun on GPU. The Raven detector adapter,
+scientific benchmarking, and a release remain future work.
 
 ## Installation
 
@@ -33,7 +40,11 @@ NumPy is the only required runtime dependency. Open3D is optional and is not nee
 python -m pip install -e ".[dev,visualization]"
 ```
 
-The local target is Apple Silicon. The M1 Pro has no CUDA support. Validate an external GPU environment, such as Kaggle, and its framework/weight compatibility before selecting a PointPillars backend or adding CUDA dependencies.
+The local target is Apple Silicon. The M1 Pro has no CUDA support. GPU-specific
+packages stay in a separate external environment: no CUDA, torch, spconv, or
+OpenPCDet dependency is added to the standard Raven installation or CPU CI.
+The reported Kaggle T4/OpenPCDet combination is evidence for that experiment;
+compatibility with other images or the new reproduction script is not guaranteed.
 
 ## CLI usage
 
