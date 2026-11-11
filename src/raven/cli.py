@@ -7,6 +7,11 @@ from collections import Counter
 from collections.abc import Sequence
 
 from raven.perception.data.kitti_annotations import load_kitti_labels
+from raven.perception.data.kitti_calibration import (
+    CAMERA_RECT_FRAME,
+    VELODYNE_FRAME,
+    load_kitti_calibration,
+)
 from raven.perception.data.kitti_loader import load_kitti_bin
 
 
@@ -27,6 +32,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     inspect.add_argument("path", help="Path to KITTI velodyne/000000.bin")
     labels = sub.add_parser("inspect-labels", help="Summarize KITTI label_2 annotations as JSON")
     labels.add_argument("path", help="Path to a KITTI label_2/000000.txt file")
+    calib = sub.add_parser(
+        "inspect-calib", help="Inspect KITTI calibration and its rigid transform"
+    )
+    calib.add_argument("path", help="Path to a KITTI calib/000000.txt file")
     visualize = sub.add_parser("visualize", help="Explore a KITTI LiDAR frame in an Open3D window")
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
@@ -43,6 +52,28 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
     try:
+        if args.command == "inspect-calib":
+            import numpy as np
+
+            calibration = load_kitti_calibration(args.path)
+            matrix = calibration.velo_to_rect
+            print(
+                json.dumps(
+                    {
+                        "matrices": {
+                            name: list(value.shape) for name, value in calibration.matrices.items()
+                        },
+                        "source_frame": VELODYNE_FRAME,
+                        "target_frame": CAMERA_RECT_FRAME,
+                        "invertible": bool(
+                            np.allclose(calibration.rect_to_velo @ matrix, np.eye(4))
+                        ),
+                        "velo_to_rect": matrix.tolist(),
+                    },
+                    indent=2,
+                )
+            )
+            return
         if args.command == "inspect-labels":
             annotations = load_kitti_labels(args.path)
             print(

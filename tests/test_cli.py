@@ -17,7 +17,13 @@ def frame(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "args", [["--help"], ["visualize", "--help"], ["inspect-labels", "--help"]]
+    "args",
+    [
+        ["--help"],
+        ["visualize", "--help"],
+        ["inspect-labels", "--help"],
+        ["inspect-calib", "--help"],
+    ],
 )
 def test_help_without_open3d(args, monkeypatch, capsys):
     monkeypatch.setitem(sys.modules, "open3d", None)

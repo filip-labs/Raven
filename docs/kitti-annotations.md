@@ -85,9 +85,9 @@ explicitly select geometric_center or bottom_center position semantics.
 
 Both models use meters and radians, preserve angle values without normalization,
 and defensively store vectors as immutable numeric tuples. Ground truth has no
-prediction score field. The next calibration and bounding-box visualization
-modules must honor the frame, reference point, dimension ordering, and rotation
-axis before combining annotations with Velodyne point clouds.
+prediction score field. The [calibration module](kitti-calibration.md) converts these boxes to full-pose
+geometry while retaining their original records. Future bounding-box visualization
+must honor the frame, reference point, dimension ordering, and rotation axes.
 
 ## CLI and validation
 
