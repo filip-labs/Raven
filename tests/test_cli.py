@@ -16,13 +16,16 @@ def frame(tmp_path):
     return path
 
 
-@pytest.mark.parametrize("args", [["--help"], ["visualize", "--help"]])
+@pytest.mark.parametrize(
+    "args", [["--help"], ["visualize", "--help"], ["inspect-labels", "--help"]]
+)
 def test_help_without_open3d(args, monkeypatch, capsys):
     monkeypatch.setitem(sys.modules, "open3d", None)
     with pytest.raises(SystemExit) as exc:
         main(args)
     assert exc.value.code == 0
-    assert "visualize" in capsys.readouterr().out
+    expected = "visualize" if args == ["--help"] else args[0]
+    assert expected in capsys.readouterr().out
 
 
 def test_inspect_json_without_open3d(frame, monkeypatch, capsys):

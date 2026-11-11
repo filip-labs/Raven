@@ -3,8 +3,10 @@
 import argparse
 import json
 import math
+from collections import Counter
 from collections.abc import Sequence
 
+from raven.perception.data.kitti_annotations import load_kitti_labels
 from raven.perception.data.kitti_loader import load_kitti_bin
 
 
@@ -23,6 +25,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     inspect = sub.add_parser("inspect", help="Read and summarize a KITTI LiDAR .bin frame")
     inspect.add_argument("path", help="Path to KITTI velodyne/000000.bin")
+    labels = sub.add_parser("inspect-labels", help="Summarize KITTI label_2 annotations as JSON")
+    labels.add_argument("path", help="Path to a KITTI label_2/000000.txt file")
     visualize = sub.add_parser("visualize", help="Explore a KITTI LiDAR frame in an Open3D window")
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
@@ -39,6 +43,30 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
     try:
+        if args.command == "inspect-labels":
+            annotations = load_kitti_labels(args.path)
+            print(
+                json.dumps(
+                    {
+                        "frame_id": annotations.frame_id,
+                        "coordinate_frame": annotations.coordinate_frame,
+                        "objects": len(annotations.objects),
+                        "class_counts": dict(
+                            sorted(Counter(obj.label for obj in annotations.objects).items())
+                        ),
+                        "ignored_regions": len(annotations.ignored_regions),
+                        "unknown_classes": sorted(
+                            {
+                                record.object_type
+                                for record in annotations.records
+                                if not record.is_known_class
+                            }
+                        ),
+                    },
+                    indent=2,
+                )
+            )
+            return
         cloud = load_kitti_bin(args.path)
         if args.command == "visualize":
             from raven.perception.visualization.viewer import view_point_cloud
