@@ -10,11 +10,12 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - A dataset-neutral `PointCloud` model with validated finite XYZ/intensity values and a read-only array copy.
 - Spatial range filtering that preserves intensity and frame metadata.
 - The `raven inspect` CLI for frame summaries.
+- KITTI calibration parsing and reversible point/full-pose box transformations.
 - Validated detection/ground-truth boxes and KITTI `label_2` parsing with source metadata.
 - An optional interactive Open3D viewer with distance, intensity, and uniform coloring.
 - Automated unit tests and CPU-only Python CI.
 
-PointPillars inference, object detection, GPU processing, calibration transforms, and scientific benchmarking are planned. The detection models and protocol define the backend interface; no detection backend is implemented. No inference results or release are available.
+PointPillars inference, object detection, GPU processing and scientific benchmarking are planned. The detection models and protocol define the backend interface; no detection backend is implemented. No inference results or release are available.
 
 ## Installation
 
@@ -64,6 +65,22 @@ remain ignore metadata without a valid 3D box; unknown classes are preserved.
 
 See [annotation format and model conventions](docs/kitti-annotations.md) for the
 reusable API, validation rules, optional score handling, and current limitations.
+
+## KITTI calibration and coordinate transformations
+
+```bash
+raven inspect-calib data/kitti/training/calib/000000.txt
+```
+
+Calibration parsing and point/box conversions use NumPy, without Open3D or a GUI.
+The command reports available matrix shapes, the Velodyne-to-rectified-camera
+homogeneous transform, frame names, and invertibility. Transformed box geometry
+preserves all three orientation axes and source metadata; bounding-box rendering
+is not implemented. The existing annotation frame name `kitti_rectified_camera`
+is accepted as an alias for `kitti_camera_rect`, without changing source records.
+
+See [calibration and transform conventions](docs/kitti-calibration.md) for the
+reusable API, numerical example, corner ordering, and precision limits.
 
 ## Interactive visualization
 
