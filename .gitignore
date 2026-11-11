@@ -1,0 +1,36 @@
+# Python environments and tooling
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Local datasets and model assets
+/data/
+/datasets/
+/weights/
+/checkpoints/
+*.pth
+*.pt
+*.ckpt
+*.onnx
+
+# Generated experiment outputs (keep experiment source tracked)
+/outputs/
+/results/
+/artifacts/
+/experiments/outputs/
+/experiments/results/
+
+# Local secrets and workstation files
+.env
+.env.*
+!.env.example
+.DS_Store
