@@ -10,9 +10,10 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - A dataset-neutral `PointCloud` model with validated finite XYZ/intensity values and a read-only array copy.
 - Spatial range filtering that preserves intensity and frame metadata.
 - The `raven inspect` CLI for frame summaries.
+- An optional interactive Open3D viewer with distance, intensity, and uniform coloring.
 - Automated unit tests and CPU-only Python CI.
 
-PointPillars inference, object detection, GPU processing, 3D visualization, KITTI annotation parsing, calibration transforms, and scientific benchmarking are planned. The existing detection data model and protocol only define an interface; no detection backend is implemented. No inference results or release are available.
+PointPillars inference, object detection, GPU processing, KITTI annotation parsing, calibration transforms, and scientific benchmarking are planned. The existing detection data model and protocol only define an interface; no detection backend is implemented. No inference results or release are available.
 
 ## Installation
 
@@ -24,10 +25,10 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
-NumPy is the only required runtime dependency. Open3D is optional and is not needed for the CLI, tests, or CI. To install it for future visualization work:
+NumPy is the only required runtime dependency. Open3D is optional and is not needed for help, inspection, tests, or CI. To install the viewer together with development tools:
 
 ```bash
-python -m pip install -e ".[visualization]"
+python -m pip install -e ".[dev,visualization]"
 ```
 
 The local target is Apple Silicon. The M1 Pro has no CUDA support. Validate an external GPU environment, such as Kaggle, and its framework/weight compatibility before selecting a PointPillars backend or adding CUDA dependencies.
@@ -43,6 +44,40 @@ raven inspect data/kitti/training/velodyne/000000.bin
 
 The command prints JSON containing the frame ID, coordinate frame, point count, and minimum/maximum XYZ bounds in the source sensor frame. Empty frames report null bounds. It does not run inference or display a 3D scene.
 
+## Interactive visualization
+
+With the visualization extra installed, run:
+
+```bash
+raven visualize data/kitti/training/velodyne/000000.bin
+raven visualize data/kitti/training/velodyne/000000.bin --color intensity
+raven visualize data/kitti/training/velodyne/000000.bin --color uniform --point-size 3.0
+raven visualize --help
+```
+
+The default is `--color distance --point-size 2.0`. Point size accepts finite values
+from 1 to 25 pixels. The viewer shows a two-meter coordinate frame at the sensor
+origin and includes the frame ID and coordinate frame in the window title.
+
+- **Distance:** Euclidean distance from the sensor, scaled from zero to the current
+  frame's farthest point. Near points are green, far points red, and blue is fixed
+  at 0.2. The scale is per frame, so colors are not absolute distances across scans.
+- **Intensity:** grayscale using the original reflectance, clipped to [0, 1].
+  Constant intensities retain their brightness without normalization or division.
+- **Uniform:** neutral gray for every point.
+
+Coloring does not alter the original XYZ, intensity, or coordinate metadata.
+Open3D is imported only when a nonempty cloud is displayed; help, inspection, and
+unit tests work without it. Missing dependencies, invalid files, empty clouds,
+and failed window creation produce CLI errors. Empty frames remain valid for
+`raven inspect`.
+
+This is a single-frame desktop viewer requiring a graphical session and OpenGL.
+Headless rendering is not supported. Rendering requires Open3D geometry and RGB
+buffers in addition to the original cloud. Detection, bounding boxes, ground-truth
+overlays, and frame navigation are not implemented. Use the window close control
+to finish the command; Open3D's built-in navigation controls are not customized.
+
 ## Testing
 
 ```bash
@@ -50,7 +85,7 @@ python -m pytest -q
 python -m ruff check .
 ```
 
-Tests generate small synthetic point clouds in temporary directories and require no dataset downloads, pretrained weights, Open3D, or GPU. GitHub Actions runs installation, Ruff, and pytest with Python 3.11 on pull requests and pushes to `main`.
+Tests generate small synthetic point clouds in temporary directories and require no dataset downloads, pretrained weights, Open3D, display, or GPU. Rendering is mocked in unit tests; an optional smoke test checks loading and coloring a real local KITTI frame when available and skips when absent. GitHub Actions runs installation, Ruff, and pytest with Python 3.11 on pull requests and pushes to `main`.
 
 ## Academic research objective
 
