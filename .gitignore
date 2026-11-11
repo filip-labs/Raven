@@ -1,6 +1,9 @@
 # Python environments and tooling
 .venv/
 venv/
+env/
+ENV/
+.venv.*/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -12,25 +15,38 @@ htmlcov/
 build/
 dist/
 
-# Local datasets and model assets
+# Local datasets (root paths must not hide src/raven/perception/data)
 /data/
 /datasets/
+/downloads/
+*.bin
+
+# Pretrained model weights and checkpoints
 /weights/
 /checkpoints/
 *.pth
 *.pt
 *.ckpt
 *.onnx
+*.safetensors
+*.h5
 
-# Generated experiment outputs (keep experiment source tracked)
+# Generated experiment outputs; keep experiment source tracked
 /outputs/
 /results/
 /artifacts/
 /experiments/outputs/
 /experiments/results/
+/tmp/
+/temp/
+*.log
 
 # Local secrets and workstation files
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+.idea/
+*.iml
 .DS_Store
