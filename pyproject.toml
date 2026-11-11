@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "raven-vision"
+version = "0.0.1"
+description = "LiDAR perception research starter for Raven"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24,<3"]
+
+[project.optional-dependencies]
+visualization = ["open3d>=0.18"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+raven = "raven.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/raven"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
