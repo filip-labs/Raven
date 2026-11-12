@@ -3,8 +3,12 @@
 Raven Vision has a user-verified report of pretrained PointPillars execution on
 real KITTI LiDAR data using OpenPCDet on Kaggle. This establishes external GPU
 inference feasibility. It does not implement the Raven detector adapter or
-establish detection accuracy. The GPU experiment was **not independently rerun**
-during this repository update.
+establish detection accuracy. A subsequent
+[PR #54 validation report](https://github.com/filip-labs/Raven/pull/54#issuecomment-6808816795)
+confirms the standalone runner executed successfully on a Kaggle T4 and reproduced
+the same 29 predictions by class. This is experimenter-reported GPU evidence, not
+a new GPU rerun during the RV-004 documentation update. Individual box/score
+equivalence remains unverified.
 
 ## Evidence and its boundaries
 
@@ -133,7 +137,8 @@ not a step validated here. Other missing dependencies must be diagnosed separate
 
 The new [headless runner](../scripts/kaggle_pointpillars.py) follows the pinned
 OpenPCDet dataset preparation, batching, network construction, and forward APIs
-without importing its GUI demo. Its GPU path has not been run here. Its input
+without importing its GUI demo. Its GPU path was successfully run on the reported
+Kaggle T4 stack (PR #54), producing `raven_predictions_verified.json`. Its input
 validation, JSON serialization, CLI, and mocked orchestration are CPU-tested.
 The script's output schema is new and does not claim to match the missing JSON.
 
@@ -174,7 +179,8 @@ needs pickle metadata, inspect that error and deliberately opt in using
 Unlike upstream's permissive partial loader, this runner uses strict state-dict
 loading and will fail rather than infer from partially loaded weights. These
 loading choices are intentional differences from the unarchived notebook and
-require GPU validation. There is no global torch.load monkeypatch.
+were exercised by the reported successful runner execution; they do not establish
+per-box equivalence with the original notebook. There is no global torch.load monkeypatch.
 
 The script enters OpenPCDet's `tools/` directory while resolving base YAMLs,
 checks the imported package against the requested checkout, and records the actual
@@ -207,8 +213,8 @@ The runner retains the configuration's range filtering, score threshold, and NMS
 it does not force the reported count of 29 or hardcode class predictions.
 
 Still open: archive the original notebook/logs/JSON, establish exact effective
-configuration and installation details, record checkpoint usage terms, rerun this
-new script on GPU, and then implement the Raven inference adapter and scientific
+configuration and installation details, record checkpoint usage terms, compare
+individual boxes/scores, and then implement the Raven inference adapter and scientific
 evaluation separately. Matching counts alone would not establish accuracy or
 byte-identical reproduction. Keep all datasets, weights, downloaded archives,
 and generated outputs outside tracked files; default outputs go under ignored
@@ -217,8 +223,8 @@ and generated outputs outside tracked files; default outputs go under ignored
 ## Issue acceptance evidence
 
 - **RV-005:** The experimenter's successful real-sample execution, hardware,
-  software stack, and workarounds are recorded. Independent GPU rerun and archival
-  of the original setup remain follow-up verification, not claimed completion.
+  software stack, and workarounds are recorded, including successful standalone
+  runner execution in PR #54. Original setup archival remains follow-up work.
 - **RV-019:** OpenPCDet is the provisional, reported-working choice with a pinned
   revision, comparison boundary, code license, checkpoint pairing, and explicit
   limitations. This does not commit Raven's core to CUDA or claim another backend
@@ -227,5 +233,6 @@ and generated outputs outside tracked files; default outputs go under ignored
   checkpoint checksum were independently checked; weights remain untracked.
   Weight usage terms and historical effective YAML bytes remain to be archived.
 
-These items are suitable for review of the stated evidence; none is automatically
-closed or marked Done. The new runner's GPU compatibility remains unverified.
+Issue status is tracked on GitHub. Standalone GPU execution is validated for the
+reported stack; adapter integration, box/score equivalence and accuracy remain open.
+See the [KITTI dataset policy](kitti-dataset.md) before interpreting future metrics.
