@@ -2,8 +2,9 @@
 
 Raven Vision has a user-verified report of pretrained PointPillars execution on
 real KITTI LiDAR data using OpenPCDet on Kaggle. This establishes external GPU
-inference feasibility. It does not implement the Raven detector adapter or
-establish detection accuracy. A subsequent
+inference feasibility, not detection accuracy. The newer
+[reusable adapter](pointpillars-adapter.md) shares this workflow, but its GPU
+acceptance run and the refactored backend smoke test remain pending. A subsequent
 [PR #54 validation report](https://github.com/filip-labs/Raven/pull/54#issuecomment-6808816795)
 confirms the standalone runner executed successfully on a Kaggle T4 and reproduced
 the same 29 predictions by class. This is experimenter-reported GPU evidence, not
@@ -214,8 +215,9 @@ it does not force the reported count of 29 or hardcode class predictions.
 
 Still open: archive the original notebook/logs/JSON, establish exact effective
 configuration and installation details, record checkpoint usage terms, compare
-individual boxes/scores, and then implement the Raven inference adapter and scientific
-evaluation separately. Matching counts alone would not establish accuracy or
+individual boxes/scores, validate the new reusable adapter/shared backend on GPU,
+and implement scientific evaluation separately. Matching counts alone would not
+establish accuracy or
 byte-identical reproduction. Keep all datasets, weights, downloaded archives,
 and generated outputs outside tracked files; default outputs go under ignored
 `outputs/`. Do not save generated JSON under scripts/ or tests/.

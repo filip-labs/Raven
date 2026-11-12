@@ -93,14 +93,15 @@ blocks imports of torch, OpenPCDet/pcdet, spconv/cumm and Open3D, then imports t
 normal Raven package/models and runs the test double. No KITTI downloads, GPU,
 display, new runtime dependencies or CI changes are required.
 
-## Future PointPillars implementation
+## Optional PointPillars implementation
 
-RV-022 will implement this same `detect(cloud)` method around an external backend.
-It will own model preprocessing/inference and return standardized boxes in the
-input frame; RV-023 prediction conversion and RV-024 reference comparison remain
-separate work. No PointPillars adapter, prediction overlay or new GPU inference
-code is implemented by RV-021. The standalone
-[Kaggle feasibility runner](pointpillars-feasibility.md) is not this adapter.
+RV-022 adds an [optional PointPillars adapter](pointpillars-adapter.md) using this
+same `detect(cloud)` method. It owns model preprocessing/inference and returns
+standardized boxes in the input frame; its new GPU acceptance run is pending.
+RV-023 prediction conversion and RV-024 reference comparison remain
+separate work. RV-021 itself added no backend inference or overlays. The standalone
+[Kaggle feasibility runner](pointpillars-feasibility.md) now provides `--adapter`
+to exercise the detector API, while sharing one backend implementation.
 
 CUDA, torch, spconv and OpenPCDet belong in a separately provisioned optional GPU
 environment. Importing the core contract or running CPU tests must never import
