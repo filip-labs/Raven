@@ -104,4 +104,16 @@ class GroundTruth3D:
 
 
 class ObjectDetector(Protocol):
-    def detect(self, cloud: PointCloud) -> list[Detection3D]: ...
+    """Model-independent, synchronous inference on a validated point cloud.
+
+    Implementations preserve cloud points (including intensity), frame_id and
+    coordinate_frame. Results are a list of validated Detection3D values; an
+    empty list means no detections. Every box must use cloud.coordinate_frame.
+    Backends own any required coordinate/unit/box-convention conversion and
+    must report failure rather than silently return an incompatible frame.
+    This protocol documents obligations; it performs no runtime validation.
+    """
+
+    def detect(self, cloud: PointCloud) -> list[Detection3D]:
+        """Return geometric-center predictions without modifying the input."""
+        ...
