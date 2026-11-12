@@ -1,36 +1,27 @@
-"""Headless, single-frame OpenPCDet experiment runner; GPU execution is unverified.
+"""Headless OpenPCDet runner with optional ObjectDetector adapter validation.
 
 Install Raven's NumPy-only core first. GPU packages belong only in the external
-Kaggle environment. This is an experiment script, not a Raven detector adapter.
+Kaggle environment. --adapter invokes the reusable PointPillarsDetector API.
+The original runner was T4-validated; the shared backend/adapter needs a new GPU run.
 """
 
 import argparse
-import hashlib
-import importlib.metadata
 import json
-import os
-import pickle
-import platform
 import re
 import subprocess
-import sys
-from collections import Counter
-from collections.abc import Mapping
-from contextlib import contextmanager
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 
 from raven.perception.data.kitti_loader import load_kitti_bin
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+from raven.perception.detection._openpcdet import (
+    OpenPCDetSession,
+    serialize_predictions,
+    sha256_file,
+)
+from raven.perception.detection.pointpillars import PointPillarsDetector
 
 
 def sha256_argument(value: str) -> str:
@@ -54,202 +45,50 @@ def validate_input(path: Path, expected_sha256: str | None = None):
     }
 
 
-def serialize_predictions(boxes, scores, labels, class_names) -> dict:
-    """Serialize raw OpenPCDet KITTI boxes, without evaluation or axis conversion."""
-    names = list(class_names)
-    if (
-        not names
-        or any(not isinstance(name, str) or not name.strip() for name in names)
-        or len(set(names)) != len(names)
-    ):
-        raise ValueError("Class names must be unique nonempty strings")
-    boxes, scores, labels = np.asarray(boxes), np.asarray(scores), np.asarray(labels)
-    if boxes.ndim != 2 or boxes.shape[1] != 7:
-        raise ValueError("Prediction boxes must have shape (N, 7)")
-    count = len(boxes)
-    if scores.shape != (count,) or labels.shape != (count,):
-        raise ValueError("Scores and labels must have shape (N,) matching boxes")
-    for value in (boxes, scores, labels):
-        if value.dtype.kind not in "fiu" or not np.isfinite(value).all():
-            raise ValueError("Predictions must contain finite real numeric values")
-    if (boxes[:, 3:6] <= 0).any():
-        raise ValueError("Predicted box dimensions must be positive")
-    if ((scores < 0) | (scores > 1)).any():
-        raise ValueError("Expected probability scores in [0, 1]; raw logits are unsupported")
-    if (labels != np.floor(labels)).any() or ((labels < 1) | (labels > len(names))).any():
-        raise ValueError("Labels must be one-based class indices from the model configuration")
-    predictions = [
-        {
-            "box": box.tolist(),
-            "score": float(score),
-            "label_id": int(label),
-            "class_name": names[int(label) - 1],
-        }
-        for box, score, label in zip(boxes, scores, labels, strict=True)
-    ]
-    return {
-        "coordinate_frame": "kitti_velodyne",
-        "box_format": ["x", "y", "z", "dx", "dy", "dz", "heading"],
-        "position_reference": "geometric_center",
-        "units": {"position": "m", "heading": "rad"},
-        "total_predictions": count,
-        "class_counts": dict(sorted(Counter(p["class_name"] for p in predictions).items())),
-        "predictions": predictions,
-    }
-
-
-def plain_config(value):
-    if isinstance(value, Mapping):
-        return {str(key): plain_config(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [plain_config(item) for item in value]
-    if isinstance(value, Path):
-        return str(value)
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    raise ValueError(f"Unsupported configuration value: {type(value).__name__}")
-
-
-@contextmanager
-def working_directory(path: Path):
-    previous = Path.cwd()
-    try:
-        os.chdir(path)
-        yield
-    finally:
-        os.chdir(previous)
-
-
-def package_version(name: str) -> str | None:
-    try:
-        return importlib.metadata.version(name)
-    except importlib.metadata.PackageNotFoundError:
-        return None
-
-
-def command_output(arguments):
-    try:
-        result = subprocess.run(arguments, capture_output=True, text=True, check=True)
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    return result.stdout.strip()
-
-
 def run_inference(args, cloud):
-    """Upstream prepare/collate/build/forward flow, without importing GUI demos.
-
-    Reconstructed from the pinned upstream interfaces, not recovered from the
-    successful notebook. Requires a fresh GPU process for validation.
-    """
-    for name in ("CUMM_DISABLE_JIT", "SPCONV_DISABLE_JIT"):
-        if os.environ.setdefault(name, "1") != "1":
-            raise ValueError(f"{name}=1 must be set before launching this process")
-    os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "7.5")
-    sys.path.insert(0, str(args.openpcdet_root))
-    try:
-        import torch
-
-        if not torch.cuda.is_available():
-            raise RuntimeError(
-                "An external CUDA GPU is required; CPU/macOS inference is unsupported"
-            )
-        import pcdet
-        from pcdet.config import cfg, cfg_from_yaml_file
-        from pcdet.datasets import DatasetTemplate
-        from pcdet.models import build_network, load_data_to_gpu
-        from pcdet.utils import common_utils
-    except ImportError as exc:
-        raise RuntimeError(
-            "External GPU dependencies are unavailable. See docs/pointpillars-feasibility.md; "
-            "for missing av2, review the documented optional Argoverse workaround. "
-            f"Original error: {exc}"
-        ) from exc
-    if Path(pcdet.__file__).resolve().parent != args.openpcdet_root / "pcdet":
-        raise ValueError("Imported pcdet does not match --openpcdet-root")
-    revision = subprocess.run(
-        ["git", "-C", str(args.openpcdet_root), "rev-parse", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    dirty = subprocess.run(
-        ["git", "-C", str(args.openpcdet_root), "diff", "--name-only", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.splitlines()
-    # Upstream base YAML paths are relative to tools/, not to the top-level YAML.
-    with working_directory(args.openpcdet_root / "tools"):
-        cfg_from_yaml_file(str(args.config), cfg)
-        if cfg.MODEL.NAME != "PointPillar" or cfg.MODEL.POST_PROCESSING.OUTPUT_RAW_SCORE:
-            raise ValueError("This runner requires PointPillar with OUTPUT_RAW_SCORE=False")
-        logger = common_utils.create_logger()
-        dataset = DatasetTemplate(
-            dataset_cfg=cfg.DATA_CONFIG,
-            class_names=cfg.CLASS_NAMES,
-            training=False,
-            root_path=args.input.parent,
-            logger=logger,
-        )
-        prepared = dataset.prepare_data({"points": cloud.points.copy(), "frame_id": cloud.frame_id})
-        model = build_network(model_cfg=cfg.MODEL, num_class=len(cfg.CLASS_NAMES), dataset=dataset)
-        # Explicitly strict: never claim inference from a silently partial weight load.
+    """Shared headless backend, optionally exercising the production detector API."""
+    options = {
+        "openpcdet_root": args.openpcdet_root,
+        "config": args.config,
+        "checkpoint": args.checkpoint,
+        "checkpoint_sha256": args.checkpoint_sha256,
+        "device_index": getattr(args, "device_index", 0),
+        "trust_checkpoint": args.trust_checkpoint,
+    }
+    if getattr(args, "adapter", False):
+        detector = PointPillarsDetector(**options)
         try:
-            checkpoint = torch.load(
-                args.checkpoint, map_location="cpu", weights_only=not args.trust_checkpoint
+            predictions = detector.detect(cloud)
+            names = detector.provenance["effective_config"]["CLASS_NAMES"]
+            arrays = (
+                np.array(
+                    [(*box.center_xyz, *box.size_lwh, box.yaw_rad) for box in predictions],
+                    dtype=float,
+                ).reshape(-1, 7),
+                np.array([box.score for box in predictions], dtype=float),
+                np.array([names.index(box.label) + 1 for box in predictions], dtype=int),
             )
-        except pickle.UnpicklingError as exc:
-            raise RuntimeError(
-                "Checkpoint loading failed. Review provenance and the original error; "
-                "only a trusted checkpoint may be retried explicitly with --trust-checkpoint. "
-                f"Original error: {exc}"
-            ) from exc
-        if not isinstance(checkpoint, Mapping) or not isinstance(
-            checkpoint.get("model_state"), Mapping
-        ):
-            raise TypeError("Expected an OpenPCDet checkpoint containing a model_state mapping")
-        model.load_state_dict(checkpoint["model_state"], strict=True)
-        model.cuda().eval()
-        batch = dataset.collate_batch([prepared])
-        load_data_to_gpu(batch)
-        with torch.no_grad():
-            result, _ = model.forward(batch)
-        prediction = result[0]
-        arrays = [
-            prediction[key].detach().cpu().numpy()
-            for key in ("pred_boxes", "pred_scores", "pred_labels")
-        ]
-        environment = {
-            "python": platform.python_version(),
-            "pytorch": torch.__version__,
-            "torch_cuda_runtime": torch.version.cuda,
-            "cuda_toolkit_nvcc": command_output(["nvcc", "--version"]),
-            "gpu_driver": command_output(
-                ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"]
-            ),
-            "spconv_cu126": package_version("spconv-cu126"),
-            "cumm_cu126": package_version("cumm-cu126"),
-            "numpy": np.__version__,
-            "openpcdet": pcdet.__version__,
-            "gpu": torch.cuda.get_device_name(0),
-            "compute_capability": list(torch.cuda.get_device_capability(0)),
-            "visible_gpu_count": torch.cuda.device_count(),
-            "device_index": 0,
-            "environment_flags": {
-                key: os.environ[key]
-                for key in ("CUMM_DISABLE_JIT", "SPCONV_DISABLE_JIT", "TORCH_CUDA_ARCH_LIST")
-            },
-        }
+            return (
+                arrays,
+                names,
+                {
+                    **detector.provenance,
+                    "inference_entrypoint": "PointPillarsDetector.detect",
+                    "detections": [asdict(box) for box in predictions],
+                },
+            )
+        finally:
+            detector.close()
+    session = OpenPCDetSession(**options)
+    try:
+        arrays, names = session.predict(cloud)
         return (
             arrays,
-            list(cfg.CLASS_NAMES),
-            {
-                "environment": environment,
-                "openpcdet_commit": revision,
-                "openpcdet_modified_files": dirty,
-                "effective_config": plain_config(cfg),
-            },
+            names,
+            {**session.provenance, "inference_entrypoint": "OpenPCDetSession.predict"},
         )
+    finally:
+        session.close()
 
 
 def main(argv=None) -> int:
@@ -278,6 +117,12 @@ def main(argv=None) -> int:
         action="store_true",
         help="Allow pickle loading only for a trusted, checksum-verified checkpoint",
     )
+    parser.add_argument(
+        "--adapter",
+        action="store_true",
+        help="Invoke PointPillarsDetector.detect and serialize its validated outputs",
+    )
+    parser.add_argument("--device-index", type=int, default=0, help="Visible CUDA device index")
     args = parser.parse_args(argv)
     try:
         args.input = args.input.resolve()

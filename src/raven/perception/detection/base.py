@@ -1,7 +1,7 @@
 """Validated boxes and the detection backend contract.
 
 Distances are meters and angles are radians. No coordinate transforms are
-performed here. PointPillars inference is not implemented.
+performed here. Optional inference backends are implemented in separate modules.
 """
 
 import math

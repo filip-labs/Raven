@@ -202,121 +202,99 @@ def test_backend_failure_does_not_write_predictions(runner, inference_args, monk
     assert not Path(inference_args[-1]).exists()
 
 
-def test_flags_before_import_and_missing_dependency_error(runner, scan, monkeypatch):
-    for key in ("CUMM_DISABLE_JIT", "SPCONV_DISABLE_JIT", "TORCH_CUDA_ARCH_LIST"):
-        monkeypatch.delenv(key, raising=False)
+def test_flags_before_import_and_missing_dependency_error(runner, gpu_backend, monkeypatch):
+    import os
+
     monkeypatch.setitem(sys.modules, "torch", None)
-    cloud, _ = runner.validate_input(scan)
     with pytest.raises(RuntimeError, match="GPU dependencies are unavailable"):
-        runner.run_inference(SimpleNamespace(openpcdet_root=scan.parent), cloud)
-    assert runner.os.environ["CUMM_DISABLE_JIT"] == "1"
-    assert runner.os.environ["SPCONV_DISABLE_JIT"] == "1"
-    assert runner.os.environ["TORCH_CUDA_ARCH_LIST"] == "7.5"
+        runner.run_inference(
+            SimpleNamespace(**gpu_backend.options, trust_checkpoint=False), gpu_backend.cloud
+        )
+    assert os.environ["CUMM_DISABLE_JIT"] == "1"
+    assert os.environ["SPCONV_DISABLE_JIT"] == "1"
+    assert os.environ["TORCH_CUDA_ARCH_LIST"] == "7.5"
 
 
 @pytest.mark.parametrize("trust,load_error", [(False, False), (True, False), (False, True)])
-def test_headless_backend_contract_with_fake_gpu_modules(
-    runner, scan, tmp_path, monkeypatch, trust, load_error
-):
-    from contextlib import nullcontext
+def test_headless_backend_contract_with_fake_gpu_modules(runner, gpu_backend, trust, load_error):
+    import pickle
 
-    class Config(dict):
-        __getattr__ = dict.__getitem__
+    from raven.perception.detection._openpcdet import PINNED_REVISION
 
-    root = tmp_path / "checkout"
-    (root / "tools").mkdir(parents=True)
-    config = Config(
-        MODEL=Config(NAME="PointPillar", POST_PROCESSING=Config(OUTPUT_RAW_SCORE=False)),
-        DATA_CONFIG=Config(),
-        CLASS_NAMES=["Car", "Pedestrian", "Cyclist"],
-        ROOT_DIR=root,
-    )
-    model = Mock()
-    model.cuda.return_value = model
-    model.eval.return_value = model
-    tensors = [
-        SimpleNamespace(
-            detach=lambda value=value: SimpleNamespace(
-                cpu=lambda: SimpleNamespace(numpy=lambda: value)
-            )
-        )
-        for value in predictions()
-    ]
-    model.forward.return_value = (
-        [dict(zip(("pred_boxes", "pred_scores", "pred_labels"), tensors, strict=True))],
-        {},
-    )
-    dataset = Mock()
-    dataset.prepare_data.side_effect = lambda data: data
-    dataset.collate_batch.side_effect = lambda samples: {"sample": samples[0]}
-    build = Mock(return_value=model)
-    loader = Mock(return_value={"model_state": {"synthetic_weight": 1}})
-    cuda = SimpleNamespace(
-        is_available=lambda: True,
-        get_device_name=lambda index: "Fake T4",
-        get_device_capability=lambda index: (7, 5),
-        device_count=lambda: 2,
-    )
-    fake_torch = SimpleNamespace(
-        cuda=cuda,
-        load=loader,
-        no_grad=nullcontext,
-        __version__="synthetic-test",
-        version=SimpleNamespace(cuda="test"),
-    )
-    configure = Mock(side_effect=lambda *_: None)
-    modules = {
-        "torch": fake_torch,
-        "pcdet": SimpleNamespace(__file__=str(root / "pcdet/__init__.py"), __version__="test"),
-        "pcdet.config": SimpleNamespace(cfg=config, cfg_from_yaml_file=configure),
-        "pcdet.datasets": SimpleNamespace(DatasetTemplate=Mock(return_value=dataset)),
-        "pcdet.models": SimpleNamespace(build_network=build, load_data_to_gpu=Mock()),
-        "pcdet.utils": SimpleNamespace(common_utils=SimpleNamespace(create_logger=Mock())),
-    }
-    for name, module in modules.items():
-        monkeypatch.setitem(sys.modules, name, module)
-    for name in ("CUMM_DISABLE_JIT", "SPCONV_DISABLE_JIT", "TORCH_CUDA_ARCH_LIST"):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(sys, "path", sys.path.copy())
-    monkeypatch.setattr(
-        runner.subprocess,
-        "run",
-        Mock(
-            side_effect=[
-                SimpleNamespace(stdout="synthetic-commit\n"),
-                SimpleNamespace(stdout="pcdet/datasets/__init__.py\n"),
-            ]
-        ),
-    )
-    monkeypatch.setattr(runner, "command_output", lambda _: None)
-    monkeypatch.setattr(runner, "package_version", lambda _: None)
-    arguments = SimpleNamespace(
-        input=scan,
-        openpcdet_root=root,
-        config=root / "tools/model.yaml",
-        checkpoint=tmp_path / "trusted.pth",
-        trust_checkpoint=trust,
-    )
-    cloud, _ = runner.validate_input(scan)
+    fake = gpu_backend
+    args = SimpleNamespace(**fake.options, trust_checkpoint=trust)
     previous = Path.cwd()
     if load_error:
-        import pickle
-
-        loader.side_effect = pickle.UnpicklingError("synthetic unsupported checkpoint metadata")
+        fake.loader.side_effect = pickle.UnpicklingError("synthetic unsupported metadata")
         with pytest.raises(RuntimeError, match="--trust-checkpoint"):
-            runner.run_inference(arguments, cloud)
-        loader.assert_called_once()
-        model.forward.assert_not_called()
-        assert Path.cwd() == previous
-        return
-    arrays, names, manifest = runner.run_inference(arguments, cloud)
+            runner.run_inference(args, fake.cloud)
+        fake.loader.assert_called_once()
+        fake.model.forward.assert_not_called()
+    else:
+        arrays, names, manifest = runner.run_inference(args, fake.cloud)
+        assert names == ["Car", "Pedestrian", "Cyclist"]
+        np.testing.assert_array_equal(arrays[0], fake.raw[0])
+        fake.model.load_state_dict.assert_called_once_with({"synthetic_weight": 1}, strict=True)
+        assert not np.shares_memory(
+            fake.dataset.prepare_data.call_args.args[0]["points"], fake.cloud.points
+        )
+        assert manifest["openpcdet_commit"] == PINNED_REVISION
+        assert manifest["environment"]["device_index"] == 0
+        assert manifest["environment"]["environment_flags"]["SPCONV_DISABLE_JIT"] == "1"
+        assert manifest["effective_config"]["ROOT_DIR"] == str(fake.root)
+    assert fake.loader.call_args.kwargs == {"map_location": "cpu", "weights_only": not trust}
     assert Path.cwd() == previous
-    assert names == ["Car", "Pedestrian", "Cyclist"]
-    np.testing.assert_array_equal(arrays[0], predictions()[0])
-    assert loader.call_args.kwargs == {"map_location": "cpu", "weights_only": not trust}
-    model.load_state_dict.assert_called_once_with({"synthetic_weight": 1}, strict=True)
-    assert not np.shares_memory(dataset.prepare_data.call_args.args[0]["points"], cloud.points)
-    assert manifest["openpcdet_commit"] == "synthetic-commit"
-    assert manifest["environment"]["device_index"] == 0
-    assert manifest["environment"]["environment_flags"]["SPCONV_DISABLE_JIT"] == "1"
-    assert manifest["effective_config"]["ROOT_DIR"] == str(root)
+
+
+def test_adapter_cli_invokes_detect_and_serializes_validated_outputs(
+    runner, gpu_backend, tmp_path, monkeypatch, capsys
+):
+    from raven.perception.detection.pointpillars import PointPillarsDetector
+
+    fake = gpu_backend
+    scan = tmp_path / "000000.bin"
+    fake.cloud.points.tofile(scan)
+    original = PointPillarsDetector.detect
+    calls = []
+
+    def detect(self, cloud):
+        boxes = original(self, cloud)
+        calls.append(boxes)
+        return boxes
+
+    monkeypatch.setattr(PointPillarsDetector, "detect", detect)
+    output = tmp_path / "adapter_predictions.json"
+    assert (
+        runner.main(
+            [
+                "--adapter",
+                "--input",
+                str(scan),
+                "--checkpoint",
+                str(fake.options["checkpoint"]),
+                "--checkpoint-sha256",
+                fake.options["checkpoint_sha256"],
+                "--checkpoint-source",
+                "synthetic-test-fixture",
+                "--config",
+                str(fake.options["config"]),
+                "--openpcdet-root",
+                str(fake.root),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+    document = json.loads(output.read_text())
+    assert len(calls) == 1 and len(calls[0]) == 2
+    assert document["inference_entrypoint"] == "PointPillarsDetector.detect"
+    assert document["coordinate_frame"] == "kitti_velodyne"
+    assert document["detections"][0]["coordinate_frame"] == "kitti_velodyne"
+    assert document["detections"][0]["rotation_axis"] == "z"
+    assert document["detections"][0]["center_xyz"] == [1, 2, 3]
+    assert document["class_counts"] == {"Car": 1, "Pedestrian": 1}
+    assert document["predictions"][0]["box"] == list(fake.raw[0][0])
+    assert document["checkpoint"]["sha256"] == fake.options["checkpoint_sha256"]
+    assert document["openpcdet_commit"] and document["effective_config"]
+    assert "output" in capsys.readouterr().out
