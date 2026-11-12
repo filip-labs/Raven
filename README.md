@@ -99,6 +99,14 @@ is accepted as an alias for `kitti_camera_rect`, without changing source records
 See [calibration and transform conventions](docs/kitti-calibration.md) for the
 reusable API, numerical example, corner ordering, and precision limits.
 
+## Detector interface
+
+The model-independent `ObjectDetector.detect(cloud) -> list[Detection3D]` contract
+and a reusable CPU-only test double are documented in the
+[detector developer guide](docs/object-detector.md). Backends must preserve the
+input and return geometric-center detections in its coordinate frame. The
+PointPillars adapter remains future work.
+
 ## Interactive visualization
 
 With the visualization extra installed, run:
