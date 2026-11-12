@@ -1,0 +1,16 @@
+{
+  "upstream_commit": "233f849829b6ac19afb8af8837a0246890908755",
+  "files": {
+    "train": {
+      "url": "https://raw.githubusercontent.com/open-mmlab/OpenPCDet/233f849829b6ac19afb8af8837a0246890908755/data/kitti/ImageSets/train.txt",
+      "count": 3712,
+      "sha256": "b6417a1d9b18c8fdb085128e633d28ff321b7674a6d1b3841b8f43d865b281cb"
+    },
+    "val": {
+      "url": "https://raw.githubusercontent.com/open-mmlab/OpenPCDet/233f849829b6ac19afb8af8837a0246890908755/data/kitti/ImageSets/val.txt",
+      "count": 3769,
+      "sha256": "657ac4bcc1e156e5b106a4ca18e1f88e012787ea1d2b5d0adeea97fee903fa86"
+    }
+  },
+  "retrieved_on": "2026-11-12"
+}

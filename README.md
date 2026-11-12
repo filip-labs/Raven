@@ -20,8 +20,10 @@ real KITTI data: 29 predictions from frame 000000. This demonstrates external GP
 feasibility, not measured accuracy or an implemented Raven inference adapter.
 See [PointPillars feasibility and reproduction](docs/pointpillars-feasibility.md)
 for the reported environment, independently checked input/checkpoint hashes, and
-remaining reproduction gaps. The new headless experiment runner has CPU-tested
-validation/serialization but has not been rerun on GPU. The Raven detector adapter,
+remaining reproduction gaps. The headless experiment runner also completed a
+[successful Kaggle T4 run](https://github.com/filip-labs/Raven/pull/54#issuecomment-6808816795)
+with matching prediction counts; individual box/score equivalence and accuracy
+remain unverified. The Raven detector adapter,
 scientific benchmarking, and a release remain future work.
 
 ## Installation
@@ -44,7 +46,7 @@ The local target is Apple Silicon. The M1 Pro has no CUDA support. GPU-specific
 packages stay in a separate external environment: no CUDA, torch, spconv, or
 OpenPCDet dependency is added to the standard Raven installation or CPU CI.
 The reported Kaggle T4/OpenPCDet combination is evidence for that experiment;
-compatibility with other images or the new reproduction script is not guaranteed.
+compatibility with other GPU images is not guaranteed.
 
 ## CLI usage
 
@@ -56,6 +58,10 @@ raven inspect data/kitti/training/velodyne/000000.bin
 ```
 
 The command prints JSON containing the frame ID, coordinate frame, point count, and minimum/maximum XYZ bounds in the source sensor frame. Empty frames report null bounds. It does not run inference or display a 3D scene.
+
+See the [KITTI dataset policy](docs/kitti-dataset.md) for official access and
+license terms, pinned 3,712/3,769 train/validation memberships, read-only integrity
+checks, and pretrained-model leakage limitations.
 
 ## KITTI annotation inspection
 
