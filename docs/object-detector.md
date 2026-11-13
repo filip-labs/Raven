@@ -97,7 +97,7 @@ display, new runtime dependencies or CI changes are required.
 
 RV-022 adds an [optional PointPillars adapter](pointpillars-adapter.md) using this
 same `detect(cloud)` method. It owns model preprocessing/inference and returns
-standardized boxes in the input frame; its new GPU acceptance run is pending.
+standardized boxes in the input frame; PR #58 records successful Kaggle T4 execution.
 RV-023 prediction conversion and RV-024 reference comparison remain
 separate work. RV-021 itself added no backend inference or overlays. The standalone
 [Kaggle feasibility runner](pointpillars-feasibility.md) now provides `--adapter`

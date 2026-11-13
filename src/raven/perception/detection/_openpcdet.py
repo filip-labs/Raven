@@ -8,7 +8,6 @@ import platform
 import re
 import subprocess
 import sys
-from collections import Counter
 from collections.abc import Mapping
 from contextlib import contextmanager
 from copy import deepcopy
@@ -16,6 +15,11 @@ from pathlib import Path
 from threading import RLock
 
 import numpy as np
+
+# Preserve the existing helper import path for the runner and external callers.
+from raven.perception.detection.predictions import serialize_predictions
+
+__all__ = ["OpenPCDetSession", "serialize_predictions"]
 
 PINNED_REVISION = "233f849829b6ac19afb8af8837a0246890908755"
 # Upstream config resolution changes process cwd; serialize our sessions.
@@ -28,51 +32,6 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def serialize_predictions(boxes, scores, labels, class_names) -> dict:
-    """Serialize raw OpenPCDet KITTI boxes, without evaluation or axis conversion."""
-    names = list(class_names)
-    if (
-        not names
-        or any(not isinstance(name, str) or not name.strip() for name in names)
-        or len(set(names)) != len(names)
-    ):
-        raise ValueError("Class names must be unique nonempty strings")
-    boxes, scores, labels = np.asarray(boxes), np.asarray(scores), np.asarray(labels)
-    if boxes.ndim != 2 or boxes.shape[1] != 7:
-        raise ValueError("Prediction boxes must have shape (N, 7)")
-    count = len(boxes)
-    if scores.shape != (count,) or labels.shape != (count,):
-        raise ValueError("Scores and labels must have shape (N,) matching boxes")
-    for value in (boxes, scores, labels):
-        if value.dtype.kind not in "fiu" or not np.isfinite(value).all():
-            raise ValueError("Predictions must contain finite real numeric values")
-    if (boxes[:, 3:6] <= 0).any():
-        raise ValueError("Predicted box dimensions must be positive")
-    if ((scores < 0) | (scores > 1)).any():
-        raise ValueError("Expected probability scores in [0, 1]; raw logits are unsupported")
-    if (labels != np.floor(labels)).any() or ((labels < 1) | (labels > len(names))).any():
-        raise ValueError("Labels must be one-based class indices from the model configuration")
-    predictions = [
-        {
-            "box": box.tolist(),
-            "score": float(score),
-            "label_id": int(label),
-            "class_name": names[int(label) - 1],
-        }
-        for box, score, label in zip(boxes, scores, labels, strict=True)
-    ]
-    return {
-        "coordinate_frame": "kitti_velodyne",
-        "box_format": ["x", "y", "z", "dx", "dy", "dz", "heading"],
-        "position_reference": "geometric_center",
-        "rotation_axis": "z",
-        "units": {"position": "m", "heading": "rad"},
-        "total_predictions": count,
-        "class_counts": dict(sorted(Counter(p["class_name"] for p in predictions).items())),
-        "predictions": predictions,
-    }
 
 
 def plain_config(value):

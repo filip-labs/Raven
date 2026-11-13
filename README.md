@@ -13,20 +13,21 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - KITTI calibration parsing and reversible point/full-pose box transformations.
 - Validated detection/ground-truth boxes and KITTI `label_2` parsing with source metadata.
 - An optional interactive Open3D viewer with selectable point coloring and calibrated KITTI ground-truth wireframes.
-- An optional reusable PointPillars detector adapter with lazy external GPU dependencies (new adapter GPU validation pending).
+- An optional reusable PointPillars detector adapter with lazy external GPU dependencies (Kaggle T4 execution reported).
 - Automated unit tests and CPU-only Python CI.
 
 A user-verified Kaggle experiment executed pretrained PointPillars inference on
 real KITTI data: 29 predictions from frame 000000. This demonstrates external GPU
-feasibility, not measured accuracy or GPU validation of the new Raven adapter.
+feasibility, not measured accuracy. The reusable adapter also has a
+[successful Kaggle T4 execution report](https://github.com/filip-labs/Raven/pull/58#issuecomment-6839286530).
 See [PointPillars feasibility and reproduction](docs/pointpillars-feasibility.md)
 for the reported environment, independently checked input/checkpoint hashes, and
 remaining reproduction gaps. The headless experiment runner also completed a
 [successful Kaggle T4 run](https://github.com/filip-labs/Raven/pull/54#issuecomment-6808816795)
 with matching prediction counts; individual box/score equivalence and accuracy
 remain unverified. The reusable adapter now has CPU-tested lifecycle and contract
-behavior; its external GPU acceptance run, scientific benchmarking and a release
-remain pending.
+behavior and reported T4 execution. Scientific benchmarking, per-box reference
+comparison and a release remain pending.
 
 ## Installation
 
@@ -108,8 +109,9 @@ and a reusable CPU-only test double are documented in the
 [detector developer guide](docs/object-detector.md). Backends must preserve the
 input and return geometric-center detections in its coordinate frame. The
 [optional PointPillars adapter](docs/pointpillars-adapter.md) implements this API
-with a model reused across scans. Its new Kaggle validation procedure remains
-pending external execution; standard Raven imports require no GPU packages.
+with a model reused across scans and reported T4 execution. Standard Raven imports
+require no GPU packages. See [prediction conversion and JSON](docs/prediction-conversion.md)
+for CPU-only export/import of validated detections, schema checks and precision limits.
 
 ## Interactive visualization
 

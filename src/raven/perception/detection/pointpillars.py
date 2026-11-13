@@ -3,25 +3,11 @@
 from pathlib import Path
 
 from raven.core.point_cloud import PointCloud
-from raven.perception.detection._openpcdet import OpenPCDetSession, serialize_predictions
+from raven.perception.detection._openpcdet import OpenPCDetSession
 from raven.perception.detection.base import Detection3D
+from raven.perception.detection.predictions import convert_predictions
 
-
-def convert_predictions(boxes, scores, labels, class_names) -> list[Detection3D]:
-    """Minimal KITTI Velodyne conversion; no axis, center or dimension changes."""
-    validated = serialize_predictions(boxes, scores, labels, class_names)
-    return [
-        Detection3D(
-            center_xyz=row["box"][:3],
-            size_lwh=row["box"][3:6],
-            yaw_rad=row["box"][6],
-            label=row["class_name"],
-            score=row["score"],
-            coordinate_frame="kitti_velodyne",
-            rotation_axis="z",
-        )
-        for row in validated["predictions"]
-    ]
+__all__ = ["PointPillarsDetector", "convert_predictions"]
 
 
 class PointPillarsDetector:
