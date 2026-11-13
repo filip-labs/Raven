@@ -2,7 +2,7 @@
 
 Install Raven's NumPy-only core first. GPU packages belong only in the external
 Kaggle environment. --adapter invokes the reusable PointPillarsDetector API.
-The original runner was T4-validated; the shared backend/adapter needs a new GPU run.
+The adapter was T4-validated in PR #58; numerical equivalence remains unverified.
 """
 
 import argparse
@@ -22,6 +22,7 @@ from raven.perception.detection._openpcdet import (
     sha256_file,
 )
 from raven.perception.detection.pointpillars import PointPillarsDetector
+from raven.perception.detection.predictions import detections_from_document
 
 
 def sha256_argument(value: str) -> str:
@@ -170,6 +171,7 @@ def main(argv=None) -> int:
             **runtime,
             **serialize_predictions(*arrays, names),
         }
+        detections_from_document(document, expected_frame_id=cloud.frame_id)
         text = json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n"
         output.parent.mkdir(parents=True, exist_ok=True)
         with output.open("x", encoding="utf-8") as stream:

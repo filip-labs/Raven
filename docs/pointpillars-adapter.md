@@ -4,13 +4,13 @@
 [`ObjectDetector`](object-detector.md) API using the OpenPCDet headless workflow.
 It is a reusable backend, independent of the single-frame experiment CLI.
 
-**Validation status:** CPU contract/lifecycle tests use mocked GPU boundaries.
-The original standalone runner was successfully executed on a Kaggle T4 in
-[PR #54](https://github.com/filip-labs/Raven/pull/54#issuecomment-6808816795).
-That evidence does **not** validate this new adapter or the refactored shared
-backend. A new real-GPU run invoking `detect()` is pending external execution.
-Neither prediction counts nor these tests measure detection accuracy or prove
-individual box/score equivalence. RV-024 retains that comparison work.
+**Validation status:** the experimenter reported successful adapter execution on
+Kaggle T4 in [PR #58](https://github.com/filip-labs/Raven/pull/58#issuecomment-6839286530):
+29 validated detections (Car 4, Pedestrian 19, Cyclist 6), `kitti_velodyne`, exit 0.
+The historical standalone runner execution is also recorded in PR #54. Individual
+box/score equivalence remains RV-024; accuracy was not measured. RV-023 adds
+[CPU-tested conversion and JSON import/export](prediction-conversion.md); the
+original GPU capture was unavailable locally and no new GPU run is claimed.
 
 ## Environment and assets
 
@@ -141,10 +141,11 @@ The shared backend intentionally follows `DatasetTemplate.prepare_data`, as the
 validated standalone workflow did. It does not invoke `KittiDataset.__getitem__`,
 read image/calibration files, or apply image-FOV cropping implied by that dataset's
 `FOV_POINTS_ONLY` setting. This is full-scan LiDAR inference with configured range
-processing, not a claim of exact KITTI benchmark data preparation. RV-023 retains
-comprehensive conversion work; RV-024 retains reference numerical comparisons.
+processing, not a claim of exact KITTI benchmark data preparation. See the
+[RV-023 conversion/JSON guide](prediction-conversion.md); RV-024 retains reference
+numerical comparisons.
 
-## Kaggle validation procedure — pending execution
+## Kaggle validation procedure
 
 In a GPU session provisioned as above, check out this PR's Raven branch, install
 its core, and use your actual licensed input location. The paths below assume
@@ -154,7 +155,7 @@ its core, and use your actual licensed input location. The paths below assume
 ```bash
 cd /kaggle/working/Raven
 git fetch origin
-git switch feat/rv-022-pointpillars-adapter
+git switch feat/rv-023-prediction-conversion
 python -m pip install -e .
 git -C /kaggle/working/OpenPCDet rev-parse HEAD
 export CUMM_DISABLE_JIT=1
@@ -178,7 +179,7 @@ Only if the reviewed checkpoint needs trusted pickle metadata, repeat with
 `--trust-checkpoint`; do not use it just to suppress an unexplained error.
 The runner refuses to overwrite outputs, and writes nothing on inference failure.
 Existing CLI flags and raw prediction schema remain available without `--adapter`,
-but that path now shares the refactored backend and also needs a new GPU smoke run.
+and that path shares the same inference backend.
 
 The adapter-mode JSON records `inference_entrypoint="PointPillarsDetector.detect"`,
 serialized `Detection3D` records under `detections`, raw-format `predictions` for
@@ -209,7 +210,8 @@ mismatch; do not edit thresholds or hardcode counts to force agreement. Matching
 counts alone does not establish box/score equivalence. Frame 000000 is a training
 split member, not held-out accuracy evidence. Archive stdout/stderr, JSON, Raven
 commit, `pip freeze`, `nvidia-smi`, `nvcc --version`, actual YAMLs/upstream diff and
-notebook export privately. No such new GPU result is claimed in this PR.
+notebook export privately. The reported PR #58 execution is historical evidence;
+no new GPU execution is claimed by the RV-023 conversion update.
 
 ## CPU verification
 
@@ -226,4 +228,4 @@ assets/config/frames, missing dependencies, selected device, strict/trusted load
 initialization reuse/failure, immutable input, multiple/empty predictions,
 serialization through an actual adapter call, JIT flags, and resource handling.
 A fresh interpreter blocks GPU/GUI imports during adapter import/construction.
-CPU tests do not substitute for the pending external GPU acceptance criterion.
+CPU tests do not substitute for per-box reference comparison or a new GPU run.
