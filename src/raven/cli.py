@@ -5,6 +5,7 @@ import json
 import math
 from collections import Counter
 from collections.abc import Sequence
+from pathlib import Path
 
 from raven.perception.data.kitti_annotations import load_kitti_labels
 from raven.perception.data.kitti_calibration import (
@@ -25,6 +26,19 @@ def _point_size(value: str) -> float:
     return size
 
 
+def _config_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate preprocessing configuration key: {key}")
+        result[key] = value
+    return result
+
+
+def _config_constant(value):
+    raise ValueError(f"Nonfinite JSON constant in preprocessing configuration: {value}")
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="raven", description="Raven Vision CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -40,6 +54,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
         "--ground-truth", action="store_true", help="Display matching KITTI ground-truth boxes"
+    )
+    visualize.add_argument(
+        "--compare",
+        metavar="CONFIG.json",
+        help="Compare raw/processed using an ordered pipeline stage JSON array",
     )
     visualize.add_argument("--predictions", help="Saved schema-v1 KITTI prediction JSON")
     visualize.add_argument("--labels", help="Explicit label_2 file (requires --ground-truth)")
@@ -59,6 +78,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if args.command == "visualize" and (args.labels or args.calib) and not args.ground_truth:
         parser.error("--labels and --calib require --ground-truth")
+    if (
+        args.command == "visualize"
+        and args.compare is not None
+        and (args.ground_truth or args.predictions is not None)
+    ):
+        parser.error(
+            "--compare cannot be combined with --ground-truth or --predictions; use the overlay viewer separately"
+        )
     try:
         if args.command == "inspect-calib":
             import numpy as np
@@ -108,6 +135,19 @@ def main(argv: Sequence[str] | None = None) -> None:
             return
         cloud = load_kitti_bin(args.path)
         if args.command == "visualize":
+            if args.compare is not None:
+                from raven.perception.preprocessing.pipeline import run_preprocessing_pipeline
+                from raven.perception.visualization.comparison import view_cloud_comparison
+
+                with Path(args.compare).open(encoding="utf-8") as stream:
+                    stages = json.load(
+                        stream, object_pairs_hook=_config_object, parse_constant=_config_constant
+                    )
+                result = run_preprocessing_pipeline(cloud, stages)
+                view_cloud_comparison(
+                    cloud, result.cloud, color=args.color, point_size=args.point_size
+                )
+                return
             from raven.perception.visualization.viewer import view_point_cloud
 
             overlays = {}
