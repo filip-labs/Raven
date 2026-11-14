@@ -1,0 +1,31 @@
+[
+  {
+    "name": "range_filter",
+    "x_range": [
+      0,
+      70
+    ],
+    "y_range": [
+      -40,
+      40
+    ],
+    "z_range": [
+      -3,
+      1
+    ]
+  },
+  {
+    "name": "voxel_downsample",
+    "voxel_size": 0.2
+  },
+  {
+    "name": "statistical_outlier_removal",
+    "nb_neighbors": 16,
+    "std_ratio": 1.0
+  },
+  {
+    "name": "noise",
+    "position_std": 0.01,
+    "seed": 42
+  }
+]

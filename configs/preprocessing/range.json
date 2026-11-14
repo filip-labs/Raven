@@ -1,0 +1,17 @@
+[
+  {
+    "name": "range_filter",
+    "x_range": [
+      0,
+      70
+    ],
+    "y_range": [
+      -40,
+      40
+    ],
+    "z_range": [
+      -3,
+      1
+    ]
+  }
+]

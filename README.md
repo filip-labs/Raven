@@ -240,6 +240,21 @@ for frame validation and graphical-test limits. Live detection, 3D text labels
 and frame navigation are not implemented. Use the window close control
 to finish the command; Open3D's built-in navigation controls are not customized.
 
+## Raw vs processed comparison
+
+```bash
+raven visualize data/kitti/training/velodyne/000000.bin \
+  --compare configs/preprocessing/full.json --color distance --point-size 3
+```
+
+The pipeline runs once, then equal-size RAW and PROCESSED windows share camera
+settings, spatial bounds and a distance-color scale. Titles show counts and
+percentage change; an empty processed result is supported. F1 prints controls,
+F2 matches from the focused window and F3 restores the paired view/window sizes.
+Install `.[visualization,preprocessing]` for this full example. See the
+[comparison guide](docs/cloud-comparison.md) for configuration, camera linking,
+macOS/headless limitations and read-only KITTI observations.
+
 ## Testing
 
 ```bash

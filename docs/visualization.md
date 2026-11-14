@@ -11,6 +11,15 @@ and saved schema-v1 predictions. No inference is run: torch, CUDA, spconv and
 OpenPCDet are not required to read or display the JSON. Open3D remains optional
 for the standard Raven installation, CLI inspection, JSON validation and CPU CI.
 
+## Raw vs processed comparison
+
+Use `raven visualize SCAN.bin --compare configs/preprocessing/full.json` for a
+side-by-side comparison using the existing preprocessing pipeline. This mode has
+its own [comparison guide](cloud-comparison.md), matched-camera controls and
+shared color scale. `--compare` cannot be combined with `--ground-truth` or
+`--predictions`; select the overlay modes below to inspect those layers. No
+inference is performed by either path.
+
 ## Four CLI modes
 
 Run from the repository root with your own licensed files. Prediction paths below
