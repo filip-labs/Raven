@@ -122,17 +122,16 @@ def gpu_backend(tmp_path, monkeypatch):
         monkeypatch.setitem(sys.modules, name, module)
     for name in ("CUMM_DISABLE_JIT", "SPCONV_DISABLE_JIT", "TORCH_CUDA_ARCH_LIST"):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(
-        backend.subprocess,
-        "run",
-        Mock(
-            side_effect=lambda *args, **kwargs: SimpleNamespace(
-                stdout=backend.PINNED_REVISION
-                if args[0][-1] == "HEAD" and "rev-parse" in args[0]
-                else "pcdet/datasets/__init__.py\n"
-            )
-        ),
-    )
+
+    def git_result(*args, **kwargs):
+        value = (
+            backend.PINNED_REVISION
+            if args[0][-1] == "HEAD" and "rev-parse" in args[0]
+            else "pcdet/datasets/__init__.py\n"
+        )
+        return SimpleNamespace(stdout=value if kwargs.get("text") else value.encode())
+
+    monkeypatch.setattr(backend.subprocess, "run", Mock(side_effect=git_result))
     monkeypatch.setattr(backend, "command_output", lambda _: None)
     monkeypatch.setattr(backend, "package_version", lambda _: None)
     return SimpleNamespace(

@@ -112,6 +112,9 @@ input and return geometric-center detections in its coordinate frame. The
 with a model reused across scans and reported T4 execution. Standard Raven imports
 require no GPU packages. See [prediction conversion and JSON](docs/prediction-conversion.md)
 for CPU-only export/import of validated detections, schema checks and precision limits.
+The [numerical reference validation guide](docs/reference-validation.md) provides
+independent OpenPCDet/Raven capture commands and a CPU-only, provenance-gated
+comparison CLI. The real per-box comparison remains pending.
 
 ## Interactive visualization
 

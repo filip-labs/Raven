@@ -21,6 +21,7 @@ from raven.perception.detection._openpcdet import (
     serialize_predictions,
     sha256_file,
 )
+from raven.perception.detection.execution_provenance import execution_provenance
 from raven.perception.detection.pointpillars import PointPillarsDetector
 from raven.perception.detection.predictions import detections_from_document
 
@@ -92,8 +93,8 @@ def run_inference(args, cloud):
         session.close()
 
 
-def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+def main(argv=None, *, inference=None, description=None) -> int:
+    parser = argparse.ArgumentParser(description=description or __doc__)
     parser.add_argument("--input", required=True, type=Path, help="KITTI float32 XYZI .bin frame")
     parser.add_argument("--input-sha256", type=sha256_argument)
     parser.add_argument(
@@ -155,7 +156,8 @@ def main(argv=None) -> int:
         ).resolve()
         if output.exists():
             raise FileExistsError(f"Refusing to overwrite {output}")
-        arrays, names, runtime = run_inference(args, cloud)
+        provenance = execution_provenance(args.openpcdet_root)
+        arrays, names, runtime = (inference or run_inference)(args, cloud)
         document = {
             "schema_version": 1,
             "runner_sha256": sha256_file(Path(__file__).resolve()),
@@ -168,6 +170,7 @@ def main(argv=None) -> int:
                 "pickle_loading_allowed": args.trust_checkpoint,
             },
             "config": {"path": str(args.config), "sha256": sha256_file(args.config)},
+            **provenance,
             **runtime,
             **serialize_predictions(*arrays, names),
         }
