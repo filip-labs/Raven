@@ -1,6 +1,8 @@
 """Interactive Open3D boundary; importing this module does not import Open3D."""
 
+import threading
 from collections.abc import Iterable
+from pathlib import Path
 
 import numpy as np
 
@@ -10,6 +12,7 @@ from raven.perception.detection.base import Detection3D
 from raven.perception.visualization.boxes import box_wireframes, prediction_wireframes
 from raven.perception.visualization.coloring import point_colors
 from raven.perception.visualization.overlays import HELP, OverlayState
+from raven.perception.visualization.scenes import SCENE_HELP, bind_scene_controls
 
 
 def view_point_cloud(
@@ -19,6 +22,8 @@ def view_point_cloud(
     point_size: float = 2.0,
     boxes: Iterable[OrientedBox3D] = (),
     predictions: Iterable[Detection3D] = (),
+    sequence=None,
+    screenshot_dir=None,
 ) -> None:
     """Display a cloud, axes, and independently controlled GT/prediction overlays.
 
@@ -28,6 +33,15 @@ def view_point_cloud(
     must already be in the cloud frame. When boxes are present, point RGB values
     are dimmed to 35% so overlay wires stand out; hiding all boxes restores colors.
     """
+    if sequence is not None:
+        if cloud is not sequence.active.cloud:
+            raise ValueError("Viewer cloud must be the active sequence frame")
+        if tuple(boxes) or tuple(predictions):
+            raise ValueError("Configure sequence overlays in FrameSequence")
+        boxes, predictions = sequence.active.boxes, sequence.active.predictions
+    if threading.current_thread() is not threading.main_thread():
+        raise RuntimeError("Open3D viewer must run on the main thread")
+    output_dir = Path(screenshot_dir or "outputs/screenshots").expanduser().resolve()
     if not np.isfinite(point_size) or not 1.0 <= point_size <= 25.0:
         raise ValueError("point size must be finite and between 1 and 25 pixels")
     colors = point_colors(cloud, color)
@@ -68,15 +82,24 @@ def view_point_cloud(
         prediction_geometry.lines = o3d.utility.Vector2iVector(pred_edges)
         prediction_geometry.colors = o3d.utility.Vector3dVector(pred_colors)
     axes = o3d.geometry.TriangleMesh.create_coordinate_frame(size=2.0, origin=[0, 0, 0])
-    interactive = bool(state.ground_truth or state.predictions)
+    interactive = bool(
+        state.ground_truth
+        or state.predictions
+        or sequence is not None
+        or screenshot_dir is not None
+    )
     visualizer = (
         o3d.visualization.VisualizerWithKeyCallback()
         if interactive
         else o3d.visualization.Visualizer()
     )
     try:
+
+        def title():
+            return f"Raven — {sequence.status() if sequence is not None else cloud.frame_id} ({cloud.coordinate_frame})"
+
         if not visualizer.create_window(
-            window_name=f"Raven — {cloud.frame_id} ({cloud.coordinate_frame})",
+            window_name=title(),
             width=1280,
             height=800,
         ):
@@ -133,6 +156,8 @@ def view_point_cloud(
                         return False
                     if key == 290:
                         print(HELP)
+                        if sequence is not None or screenshot_dir is not None:
+                            print(SCENE_HELP)
                     elif key == 298:
                         print(state.prediction_details())
                     elif state.apply_key(key):
@@ -145,6 +170,32 @@ def view_point_cloud(
                 visualizer.register_key_action_callback(key, callback(key))
             print(HELP)
             print(state.status())
+        if sequence is not None or screenshot_dir is not None:
+
+            def move(delta):
+                nonlocal cloud
+                frame = sequence.move(delta)
+                if frame is None:
+                    return
+                camera = visualizer.get_view_status()
+                cloud = frame.cloud
+                state.ground_truth, state.predictions = frame.boxes, frame.predictions
+                geometry.points = o3d.utility.Vector3dVector(cloud.points[:, :3].astype(np.float64))
+                refresh(visualizer)
+                if not visualizer.create_window(window_name=title(), width=1280, height=800):
+                    raise RuntimeError("Open3D could not update the active frame window")
+                visualizer.set_view_status(camera)
+                print(f"Active frame: {sequence.status()} | points {cloud.count}")
+
+            bind_scene_controls(
+                visualizer,
+                get_frame_id=lambda: cloud.frame_id,
+                output_dir=output_dir,
+                move=move if sequence is not None else None,
+                reset=lambda: visualizer.reset_view_point(reset_bounding_box=True),
+            )
+            if sequence is not None:
+                print(f"Active frame: {sequence.status()} | points {cloud.count}")
         options = visualizer.get_render_option()
         if options is None:
             raise RuntimeError("Open3D render options are unavailable")
