@@ -40,7 +40,8 @@ float32 precision. Higher-precision floats and integer geometry also follow the
 existing model's Python-float conversion, not arbitrary-precision arithmetic;
 values outside its finite range are rejected. No decimal rounding, epsilon
 comparison, angle normalization or threshold adjustment is introduced here.
-RV-024 must define tolerances and compare actual per-box outputs separately.
+[RV-024 reference validation](reference-validation.md) defines explicit tolerances
+and compares per-box outputs separately; real GPU comparison remains pending.
 
 ## Existing JSON envelope
 
@@ -137,7 +138,7 @@ PY
 ```
 
 Compare printed counts with the historical report without editing the capture.
-Count equality is not per-box equivalence. RV-024 owns reference matching/tolerances;
+Count equality is not per-box equivalence. [RV-024](reference-validation.md) owns reference matching/tolerances;
 RV-028 owns prediction/ground-truth overlays. This change implements neither AP
 metrics nor rendering, and makes no accuracy or independent-generalization claim.
 
