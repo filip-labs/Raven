@@ -10,6 +10,7 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - A dataset-neutral `PointCloud` model with validated finite XYZ/intensity values and a read-only array copy.
 - Spatial range filtering that preserves intensity and frame metadata.
 - Deterministic CPU voxel downsampling with mean XYZ/intensity and fixed-origin cells.
+- Statistical outlier removal with an optional CPU SciPy KD-tree backend.
 - The `raven inspect` CLI for frame summaries.
 - KITTI calibration parsing and reversible point/full-pose box transformations.
 - Validated detection/ground-truth boxes and KITTI `label_2` parsing with source metadata.
@@ -120,6 +121,17 @@ aggregation order are deterministic; metadata is preserved in an independent
 PointCloud. See [voxel semantics, precision and KITTI examples](docs/voxel-downsampling.md)
 for lossy behavior and limits. This is explicit Raven preprocessing, separate
 from OpenPCDet's internal voxel processing and future RV-017 pipelines.
+
+## Statistical outlier removal
+
+`statistical_outlier_removal(cloud, nb_neighbors, std_ratio)` retains original
+XYZI rows whose mean K-neighbor distance is at or below the global mean plus
+`std_ratio` population standard deviations. It preserves order and metadata;
+K excludes self and is capped at N-1. Install `python -m pip install -e ".[preprocessing]"`
+for the optional CPU SciPy backend. See [the statistical filtering guide](docs/statistical-outlier-removal.md)
+for small-cloud policy, duplicate handling, precision, resource costs, KITTI
+examples and observed smoke-test counts. Sparse valid objects can be removed;
+no accuracy or inference-latency improvement is claimed.
 
 ## Detector interface
 
