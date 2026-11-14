@@ -9,6 +9,7 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - KITTI Velodyne `.bin` loading with file-size validation and explicit coordinate-frame metadata.
 - A dataset-neutral `PointCloud` model with validated finite XYZ/intensity values and a read-only array copy.
 - Spatial range filtering that preserves intensity and frame metadata.
+- Deterministic CPU voxel downsampling with mean XYZ/intensity and fixed-origin cells.
 - The `raven inspect` CLI for frame summaries.
 - KITTI calibration parsing and reversible point/full-pose box transformations.
 - Validated detection/ground-truth boxes and KITTI `label_2` parsing with source metadata.
@@ -110,6 +111,15 @@ inclusive XYZ crop, preserving point order, intensity and frame metadata in an
 independent PointCloud. Empty results are valid; malformed/nonfinite/reversed
 bounds are rejected. See [range filtering semantics and examples](docs/range-filtering.md)
 for precision, coordinate conventions and future preprocessing experiment limits.
+
+## Voxel downsampling
+
+`voxel_downsample(cloud, voxel_size)` supports cubic or per-axis sizes, using
+zero-origin floor-based cells and mean XYZI representatives. Output cells and
+aggregation order are deterministic; metadata is preserved in an independent
+PointCloud. See [voxel semantics, precision and KITTI examples](docs/voxel-downsampling.md)
+for lossy behavior and limits. This is explicit Raven preprocessing, separate
+from OpenPCDet's internal voxel processing and future RV-017 pipelines.
 
 ## Detector interface
 
