@@ -103,6 +103,14 @@ is accepted as an alias for `kitti_camera_rect`, without changing source records
 See [calibration and transform conventions](docs/kitti-calibration.md) for the
 reusable API, numerical example, corner ordering, and precision limits.
 
+## Range filtering
+
+`filter_range(cloud, x_range, y_range, z_range)` performs an explicit CPU-only,
+inclusive XYZ crop, preserving point order, intensity and frame metadata in an
+independent PointCloud. Empty results are valid; malformed/nonfinite/reversed
+bounds are rejected. See [range filtering semantics and examples](docs/range-filtering.md)
+for precision, coordinate conventions and future preprocessing experiment limits.
+
 ## Detector interface
 
 The model-independent `ObjectDetector.detect(cloud) -> list[Detection3D]` contract
