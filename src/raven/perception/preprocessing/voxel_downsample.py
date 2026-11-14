@@ -49,7 +49,7 @@ def voxel_downsample(
     order. Cast means through PointCloud's float32 storage, preserving metadata.
     Validate sizes even for empty input; return independent read-only storage.
 
-    Reject nonfinite scaled coordinates or |XYZ/size| >= 2**53: float64 cannot
+    Reject scaled-coordinate underflow/nonfinite values or |XYZ/size| >= 2**53: float64 cannot
     resolve consecutive integer voxel indices beyond this conservative range.
     No OpenPCDet voxelization, intensity normalization or hash iteration is used.
     """
@@ -61,7 +61,8 @@ def voxel_downsample(
     points = cloud.points.astype(np.float64)
     with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
         scaled = points[:, :3] / sizes
-    if not np.isfinite(scaled).all() or (np.abs(scaled) >= 2**53).any():
+    underflow = (points[:, :3] != 0) & (scaled == 0)
+    if underflow.any() or not np.isfinite(scaled).all() or (np.abs(scaled) >= 2**53).any():
         raise ValueError("voxel_size/coordinates exceed the supported float64 voxel-index range")
     indices = np.floor(scaled).astype(np.int64)
     # np.lexsort's last key is primary: cells XYZ, then individual XYZI values.

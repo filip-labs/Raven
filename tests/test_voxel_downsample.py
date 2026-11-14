@@ -277,3 +277,11 @@ def test_duplicate_returns_keep_their_weight_in_intensity_mean():
     source = cloud([[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 6]])
     result = voxel_downsample(source, 1)
     np.testing.assert_array_equal(result.points, [[0, 0, 0, 2]])
+
+
+@pytest.mark.parametrize("sign", [-1, 1])
+def test_nonzero_coordinate_scaled_underflow_is_explicit(sign):
+    smallest = np.nextafter(np.float32(0), np.float32(1))
+    source = cloud([[sign * smallest, 0, 0, 0.5]])
+    with pytest.raises(ValueError, match="voxel-index range"):
+        voxel_downsample(source, 1e308)

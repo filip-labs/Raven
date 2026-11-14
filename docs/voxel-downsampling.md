@@ -89,7 +89,9 @@ idempotent. No coordinate offset or intensity rescaling is used to hide rounding
 Nonfinite scaled coordinates or `abs(coordinate/size) >= 2**53` are rejected
 explicitly. This conservative limit avoids relying on float64 to resolve unit
 integer indices beyond its consecutive-integer range and prevents unsafe int64
-casts. Tiny positive sizes can therefore be invalid for a particular cloud even
+casts. A nonzero source coordinate that underflows to scaled zero is also
+rejected, preventing negative tiny coordinates from being assigned to cell zero.
+Tiny positive or very large sizes can therefore be invalid for a particular cloud even
 though they pass the size-only check. The occupied-cell method allocates no dense
 3D grid; canonical sorting costs O(N log N), with O(N) temporary storage.
 
