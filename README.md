@@ -249,6 +249,10 @@ python -m ruff check .
 
 Tests generate small synthetic point clouds in temporary directories and require no dataset downloads, pretrained weights, Open3D, display, or GPU. Rendering is mocked in unit tests; an optional smoke test checks loading and coloring a real local KITTI frame when available and skips when absent. GitHub Actions runs installation, Ruff, and pytest with Python 3.11 on pull requests and pushes to `main`.
 
+See [M2 preprocessing regression coverage](docs/preprocessing-testing.md) for the
+coverage audit, independent four-stage references across all 24 stage orders,
+float32 boundary regressions, optional KITTI checks and reproducibility limits.
+
 ## Academic research objective
 
 **Research question:** How do point-cloud preprocessing and sensor degradation affect 3D detection accuracy and end-to-end latency?
