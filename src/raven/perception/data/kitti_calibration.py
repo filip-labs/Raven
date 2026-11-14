@@ -165,6 +165,28 @@ def transform_points(
     return result
 
 
+def box_corners(center_xyz, size_lwh, rotation) -> np.ndarray:
+    """Eight geometric-center LWH corners using a full proper rotation matrix."""
+    center = _array(center_xyz, (3,), "center_xyz")
+    size = _array(size_lwh, (3,), "size_lwh")
+    if (size <= 0).any():
+        raise ValueError("size_lwh dimensions must be positive")
+    rotation = _rotation(rotation, "box rotation")
+    signs = np.array(
+        [
+            [-1, -1, -1],
+            [1, -1, -1],
+            [1, 1, -1],
+            [-1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [1, 1, 1],
+            [-1, 1, 1],
+        ]
+    )
+    return (signs * (size / 2)) @ rotation.T + center
+
+
 @dataclass(frozen=True, eq=False)
 class OrientedBox3D:
     """Geometric-center box with full 3D orientation, retaining source metadata.
@@ -201,19 +223,7 @@ class OrientedBox3D:
     @property
     def corners(self) -> np.ndarray:
         """Eight corners: lower-height face 0..3, matching upper face 4..7."""
-        signs = np.array(
-            [
-                [-1, -1, -1],
-                [1, -1, -1],
-                [1, 1, -1],
-                [-1, 1, -1],
-                [-1, -1, 1],
-                [1, -1, 1],
-                [1, 1, 1],
-                [-1, 1, 1],
-            ]
-        )
-        return (signs * (self.size_lwh / 2)) @ self.rotation.T + self.center_xyz
+        return box_corners(self.center_xyz, self.size_lwh, self.rotation)
 
 
 def _ground_truth_geometry(box: GroundTruth3D) -> OrientedBox3D:

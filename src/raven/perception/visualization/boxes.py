@@ -117,3 +117,58 @@ def load_ground_truth_boxes(
         if geometry is not None:
             boxes.append(geometry)
     return tuple(boxes)
+
+
+PREDICTION_COLOR = (0.0, 1.0, 1.0)
+
+
+def prediction_corners(detection, coordinate_frame: str):
+    """Use the existing corner geometry with an exact +Z rotation; no frame transform."""
+    from raven.perception.data.kitti_calibration import box_corners
+    from raven.perception.detection.base import Detection3D
+
+    if not isinstance(detection, Detection3D):
+        raise TypeError("Predictions must use Detection3D")
+    if detection.coordinate_frame != coordinate_frame or coordinate_frame != VELODYNE_FRAME:
+        raise ValueError("Prediction and cloud frames must both be kitti_velodyne")
+    if detection.rotation_axis != "z":
+        raise ValueError("KITTI Velodyne predictions must rotate about Z")
+    c, s = np.cos(detection.yaw_rad), np.sin(detection.yaw_rad)
+    rotation = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+    return box_corners(detection.center_xyz, detection.size_lwh, rotation)
+
+
+def prediction_wireframes(predictions, coordinate_frame: str):
+    """Cyan dashed box edges plus an interior heading arrow and center crossbar.
+
+    Four exact collinear dash segments per edge. The glyph stays inside the box,
+    helping distinguish coincident layers without moving or inflating the box.
+    """
+    segments = []
+    for detection in predictions:
+        corners = prediction_corners(detection, coordinate_frame)
+        points, edges, _ = wireframe_from_corners(corners, detection.label)
+        for start, end in edges:
+            vector = points[end] - points[start]
+            for part in range(0, 8, 2):
+                segments.append(
+                    [points[start] + (part / 8) * vector, points[start] + ((part + 1) / 8) * vector]
+                )
+        center = np.asarray(detection.center_xyz)
+        # Derive glyph axes from the same ordered corners, retaining exact pose.
+        length_axis = (corners[1] - corners[0]) / 2
+        width_axis = (corners[3] - corners[0]) / 2
+        tip = center + length_axis
+        segments.extend(
+            [
+                [center, tip],
+                [tip, tip - 0.3 * length_axis + 0.3 * width_axis],
+                [tip, tip - 0.3 * length_axis - 0.3 * width_axis],
+                [center - 0.2 * width_axis, center + 0.2 * width_axis],
+            ]
+        )
+    if not segments:
+        return np.empty((0, 3)), np.empty((0, 2), dtype=np.int32), np.empty((0, 3))
+    vertices = np.asarray(segments).reshape(-1, 3)
+    lines = np.arange(len(vertices), dtype=np.int32).reshape(-1, 2)
+    return vertices, lines, np.tile(PREDICTION_COLOR, (len(lines), 1))

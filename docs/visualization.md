@@ -1,116 +1,194 @@
-# Point-cloud and KITTI ground-truth visualization
+# LiDAR, ground-truth and prediction overlays (RV-028)
 
-Install the existing optional Open3D extra in a graphical desktop environment:
+Install the optional desktop visualization extra:
 
 ```bash
 python -m pip install -e ".[dev,visualization]"
-raven visualize data/kitti/training/velodyne/000000.bin --ground-truth
-raven visualize data/kitti/training/velodyne/000001.bin --ground-truth --color uniform
 ```
 
-`--ground-truth` adds dataset annotations, not detector predictions. It does not
-invoke PointPillars, read prediction JSON, perform matching, or assign confidence.
-The original point-only command works unchanged when this flag is absent.
+The existing Open3D viewer displays one LiDAR scan, calibrated KITTI ground truth,
+and saved schema-v1 predictions. No inference is run: torch, CUDA, spconv and
+OpenPCDet are not required to read or display the JSON. Open3D remains optional
+for the standard Raven installation, CLI inspection, JSON validation and CPU CI.
 
-## Input paths and CLI options
+## Four CLI modes
 
-For a standard KITTI Object Detection layout, a scan at
-`SPLIT/velodyne/FRAME.bin` resolves labels at `SPLIT/label_2/FRAME.txt` and
-calibration at `SPLIT/calib/FRAME.txt`. Paths are inferred from the supplied scan,
-not the current working directory. Matching files are required even for empty
-label files; testing-split labels are not fabricated.
+Run from the repository root with your own licensed files. Prediction paths below
+are examples; the capture is not included in the repository.
 
-Nonstandard layout example:
+```bash
+# LiDAR only (existing behavior).
+raven visualize data/kitti/training/velodyne/000000.bin
+
+# LiDAR + ground truth.
+raven visualize data/kitti/training/velodyne/000000.bin --ground-truth
+
+# LiDAR + saved predictions.
+raven visualize data/kitti/training/velodyne/000000.bin \
+  --predictions /path/to/raven_adapter_predictions_000000.json
+
+# LiDAR + both overlays.
+raven visualize data/kitti/training/velodyne/000000.bin --ground-truth \
+  --predictions /path/to/raven_adapter_predictions_000000.json \
+  --color intensity --point-size 3.0
+```
+
+`--predictions PATH` uses the [RV-023 validated reader](prediction-conversion.md).
+The JSON's `input.frame_id` must match the scan stem, and all coordinate/box
+conventions must be supported. Its filename can differ from the scan stem.
+Missing files, malformed JSON, incompatible schema/conventions and mismatched
+frame IDs fail before a GUI opens. Schema-v1 adapter and raw-only captures are
+supported; malformed predictions are never silently omitted. Empty captures
+produce no prediction lines. Reading/rendering never modifies the capture.
+
+For standard `SPLIT/velodyne/FRAME.bin` paths, `--ground-truth` resolves matching
+`SPLIT/label_2/FRAME.txt` and `SPLIT/calib/FRAME.txt`. Nonstandard example:
 
 ```bash
 raven visualize /path/to/scans/000000.bin --ground-truth \
   --labels /path/to/annotations/000000.txt \
   --calib /path/to/calibration/000000.txt \
-  --color intensity --point-size 3.0
+  --predictions /path/to/raven_adapter_predictions_000000.json
 ```
 
-`--labels` and `--calib` require `--ground-truth`. In a standard layout, either
-path can override its inferred sibling; otherwise both explicit paths are needed.
-All three filename stems must match exactly. This catches obvious frame mistakes
-but does not prove files from different sequences with equal names belong together;
-the user must supply the correct matching calibration and labels.
+`--labels` and `--calib` still require `--ground-truth`. Standard layouts allow
+one inferred sibling to be overridden; otherwise provide both. All scan/label/
+calibration stems must match. Missing files are errors even when labels are empty;
+DontCare records create no physical box. Testing labels are not fabricated.
 
-Missing files, malformed annotations/calibration, mismatched frame IDs, and invalid
-CLI options fail before a GUI opens. Empty or DontCare-only annotation files show
-the point cloud with no box lines. An empty cloud remains invalid for visualization.
+Stem/JSON frame agreement does not authenticate scan bytes, sequence, partition
+or calibration identity. Use the correct associated data and retain provenance.
+The viewer performs no reference matching, AP measurement or accuracy evaluation.
 
-The point-color modes remain distance (default), intensity, and uniform. Point
-size accepts finite values from 1 to 25 pixels, default 2. Box colors are fixed:
+## Interactive controls and legend
 
-| Annotation class | Box RGB | Appearance |
-| --- | --- | --- |
-| Car | (0, 1, 0) | Green |
-| Pedestrian | (1, 0, 0) | Red |
-| Cyclist | (0, 0, 1) | Blue |
-| Van, Truck, Person_sitting, Tram, Misc, unknown names | (1, 1, 0) | Yellow fallback |
+With at least one box supplied, the viewer prints the legend and current layer/
+class counts to its launching terminal. Focus the window before pressing keys;
+on macOS the keyboard may require **Fn + F1–F9**.
 
-The wireframes use saturated RGB values. Whenever at least one box is present,
-point RGB values are multiplied by 0.35, preserving the selected mapping while
-making box lines brighter. With no boxes, point coloring is unchanged. There are
-no labels, legends, class filters, confidence labels, or independent layer toggles.
+| Key | Action |
+| --- | --- |
+| F1 | Print controls and legend again |
+| F2 | Toggle ground truth independently |
+| F3 | Toggle predictions independently |
+| F4 | Both off when both enabled; otherwise enable both |
+| F5 | Car only, on both layers |
+| F6 | Pedestrian only, on both layers |
+| F7 | Cyclist only, on both layers |
+| F8 | Restore all classes, including other/unknown annotation classes |
+| F9 | Print currently visible predictions' class, confidence, center, LWH and yaw |
+
+Class filtering preserves each layer's on/off state. F4 preserves the class
+filter. Controls operate on already supplied boxes; they do not load missing
+layers or execute inference. With no boxes at all, the point-only viewer remains
+available. F9 is terminal output, not a 3D text label; displayed numbers use nine
+significant digits, without modifying stored values or applying score thresholds.
+
+| Layer/class | Appearance |
+| --- | --- |
+| GT Car | Solid green |
+| GT Pedestrian | Solid red |
+| GT Cyclist | Solid blue |
+| GT other classes | Solid yellow |
+| All predictions | Cyan dashed edges, interior heading arrow and center crossbar |
+
+Each prediction edge has four collinear dash segments; the interior glyph helps
+identify the prediction layer even when its bounding edges coincide with GT.
+Box centers, corners and dimensions are never offset or inflated for styling.
+Coincident rasterized edges can occlude each other, so use the independent toggles
+for close inspection. The cyan arrow/crossbar does not represent extra detections.
+
+Point colors remain distance (default), intensity or uniform; point size remains
+1–25 pixels, default 2. Visible boxes dim the selected point RGB values to 35%.
+Hiding/filtering all boxes restores full brightness. Layer changes preserve the
+camera via `reset_bounding_box=False`; mouse navigation and other native Open3D
+shortcuts remain unchanged. No numeric keys are intercepted, preserving Open3D's
+native color controls. Close the window or use native Q/Escape.
+
+The implementation uses Open3D's
+[key-action callback API](https://www.open3d.org/docs/release/python_api/open3d.visualization.VisualizerWithKeyCallback.html#open3d.visualization.VisualizerWithKeyCallback.register_key_action_callback)
+and [GLFW function-key tokens](https://www.glfw.org/docs/latest/group__keys.html).
+Only unmodified press events act; release/repeat events are ignored. Function
+keys avoid the built-in letter/numeric shortcuts; OS shortcuts may still intercept
+keys before they reach the window.
 
 ## Geometry and reusable API
 
 ```python
 from raven.perception.data.kitti_loader import load_kitti_bin
+from raven.perception.detection.predictions import load_detections
 from raven.perception.visualization.boxes import load_ground_truth_boxes
 from raven.perception.visualization.viewer import view_point_cloud
 
 path = "data/kitti/training/velodyne/000000.bin"
 cloud = load_kitti_bin(path)
-boxes = load_ground_truth_boxes(path)
-view_point_cloud(cloud, boxes=boxes, color="uniform")
+ground_truth = load_ground_truth_boxes(path)
+predictions = load_detections("/path/to/raven_adapter_predictions_000000.json",
+                              expected_frame_id=cloud.frame_id)
+view_point_cloud(cloud, boxes=ground_truth, predictions=predictions, color="uniform")
 ```
 
-The existing annotation parser preserves KITTI rectified-camera bottom centers
-and rotation about camera Y. `load_ground_truth_boxes` reuses
-`load_kitti_calibration` and `transform_annotation` to produce `OrientedBox3D`
-geometry in `kitti_velodyne` (X forward, Y left, Z up; meters). The calibration
-module performs the bottom-to-geometric-center offset and full matrix rotation.
-No yaw approximation, manual axis swap, or second transformation is added by the
-viewer. Source annotation references and immutable calibration arrays are preserved.
-See [calibration conventions](kitti-calibration.md) for the equations and tolerances.
+`boxes=` retains its existing OrientedBox3D interface. `predictions=` accepts
+validated Detection3D values. Ground truth reuses calibration and
+`transform_annotation`: rectified-camera bottom center is shifted to geometric
+center, then the **full pose** is transformed into `kitti_velodyne` (X forward,
+Y left, Z up; meters). Calibration roll/pitch are preserved; no yaw approximation,
+manual axis swap or second transform is added. Original annotation references and
+calibration arrays remain untouched.
 
-`wireframe_from_corners(corners, label)` validates and copies eight distinct finite
-ordered vertices. `box_wireframes(boxes, coordinate_frame)` rejects mismatched
-frames and batches all boxes into one points/edges/colors tuple without Open3D.
-The viewer converts it into one Open3D LineSet. Lower local-height corners are
-0–3, upper corners 4–7; edges are:
+Predictions already have geometric-center Velodyne coordinates, LWH sizes and
+heading about +Z in radians. Rendering constructs the exact Z rotation and uses
+the shared `box_corners` geometry used by OrientedBox3D. Generic `lidar`/camera
+frames and non-Z prediction axes fail explicitly, without relabeling/transforming
+the box. Source coordinates, confidence and point intensity remain unchanged.
+The JSON reader checks frame IDs before the renderer receives the predictions.
+Direct API callers are responsible for associating predictions with the correct
+scan because Detection3D itself has no per-scan frame ID.
 
-```text
-0–1, 1–2, 2–3, 3–0
-4–5, 5–6, 6–7, 7–4
-0–4, 1–5, 2–6, 3–7
-```
+The existing `wireframe_from_corners` validates eight distinct finite corners.
+GT batching uses the existing twelve-edge topology (lower face 0–3, upper 4–7,
+corresponding vertical edges). Prediction dash endpoints lie on those same edges;
+its direction glyph lies inside the box. No axis-aligned or minimum-volume fit
+is used. See [calibration conventions](kitti-calibration.md).
 
-Each box has eight vertices and twelve edges. Corners come directly from the full
-source geometry, including calibration roll and pitch. No minimum-volume or
-axis-aligned box is fitted. Unknown classes retain their original names and use
-the fallback color; DontCare is ignore metadata and produces no physical box.
+## Using saved RV-024 captures
+
+Download `raven_adapter_predictions_000000.json` from the external session to a
+private local path; pass it with `--predictions` and your matching local scan.
+The RV-024 comparison report itself is not a prediction capture. Keep the
+reference/candidate/report and their hashes together for provenance, without
+committing them or the dataset/checkpoint.
+
+[PR #60's experimenter report](https://github.com/filip-labs/Raven/pull/60#issuecomment-6868499971)
+records all 29 reference/candidate detections matching with zero reported errors
+for frame 000000 on a T4. That supports numerical agreement for that case, not
+KITTI AP/mAP or generalization. The actual captured prediction JSON was not found
+in local repository/Downloads/attachments searches for RV-028 and was not fabricated.
 
 ## Validation and limitations
 
-CPU tests verify geometry, vertex/edge counts, edge lengths, independent camera to
-LiDAR corner calculations, full rotation, color selection, file resolution,
-missing/mismatched inputs, ignored/empty annotations, and the mocked Open3D
-boundary. They require neither Open3D nor a display, real dataset, CUDA, or network.
+CPU tests cover exact prediction poses/edge lengths, dashed/glyph geometry,
+independently calculated camera-to-LiDAR alignment, unsupported frames/axes,
+class filters and layer visibility, key press/repeat behavior, confidence output,
+camera-preserving Open3D calls, CLI modes/errors and GPU-free capture loading.
+Existing annotation/calibration and point-only CLI tests remain in place.
 
-A real-scene smoke check should load matching scan/label/calibration files, compare
-wireframe corners to calibrated geometry numerically, then open the scene. Render
-captures provide additional visual evidence; screenshots alone do not establish
-mathematical correctness. Manual mouse rotation, zoom, pan, and window closing
-remain user validation when desktop automation cannot exercise them reliably.
-The viewer uses the existing Open3D event loop and does not override those controls.
+Actual graphical checks ran on the local macOS desktop with **Open3D 0.20.0**:
 
-This remains a single-frame desktop viewer requiring graphical OpenGL support.
-Headless rendering, model prediction overlays, detector inference, and frame
-navigation are outside scope. Thin lines and apparent color depend on display
-resolution, viewing distance, occlusion, and OpenGL rendering. The initial view
-continues to fit the point cloud; zoom in to inspect small or distant boxes.
-Point clouds and all source data remain unmodified, and no screenshots or datasets
-are checked into the repository.
+- A clearly labeled synthetic three-class scene used exactly coincident GT and
+  prediction boxes. Native window inspection verified both styles, F1–F9,
+  independent/both toggles, all class filters, restored point brightness,
+  confidence/help output, mouse rotation/zoom, and clean Q closing.
+- The real KITTI frame 000000 opened through the CLI with its real calibration/
+  labels plus one explicitly synthetic prediction JSON under `/tmp`. Both layers
+  loaded; F9 printed the synthetic record and window closing returned exit 0.
+  This tests the real scan/GT and saved-JSON path, not model prediction correctness.
+
+Synthetic predictions are not the unavailable Kaggle capture. Pan behavior and
+other platforms/display drivers have not been separately exercised in this update.
+No screenshots, datasets, checkpoints or prediction captures are committed.
+
+This remains a single-frame graphical OpenGL viewer. No headless rendering,
+inference, live detection, frame navigation, AP metrics or 3D confidence text UI
+is added. Line visibility depends on zoom, occlusion, resolution and driver;
+the initial camera fits the LiDAR scene, so zoom in for small/distant boxes.

@@ -41,6 +41,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     visualize.add_argument(
         "--ground-truth", action="store_true", help="Display matching KITTI ground-truth boxes"
     )
+    visualize.add_argument("--predictions", help="Saved schema-v1 KITTI prediction JSON")
     visualize.add_argument("--labels", help="Explicit label_2 file (requires --ground-truth)")
     visualize.add_argument("--calib", help="Explicit calibration file (requires --ground-truth)")
     visualize.add_argument(
@@ -109,17 +110,22 @@ def main(argv: Sequence[str] | None = None) -> None:
         if args.command == "visualize":
             from raven.perception.visualization.viewer import view_point_cloud
 
+            overlays = {}
             if args.ground_truth:
                 from raven.perception.visualization.boxes import load_ground_truth_boxes
 
-                boxes = load_ground_truth_boxes(
+                overlays["boxes"] = load_ground_truth_boxes(
                     args.path, labels_path=args.labels, calibration_path=args.calib
                 )
-                view_point_cloud(cloud, color=args.color, point_size=args.point_size, boxes=boxes)
-                return
-            view_point_cloud(cloud, color=args.color, point_size=args.point_size)
+            if args.predictions:
+                from raven.perception.detection.predictions import load_detections
+
+                overlays["predictions"] = load_detections(
+                    args.predictions, expected_frame_id=cloud.frame_id
+                )
+            view_point_cloud(cloud, color=args.color, point_size=args.point_size, **overlays)
             return
-    except (OSError, ValueError, RuntimeError) as exc:
+    except (OSError, ValueError, TypeError, RuntimeError) as exc:
         parser.error(str(exc))
     if args.command == "inspect":
         print(

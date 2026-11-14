@@ -2,10 +2,12 @@
 
 The CPU-only comparator validates two schema-v1 prediction captures using the
 [RV-023 reader](prediction-conversion.md). It reports numerical agreement and
-provenance verification separately. **Real reference-versus-adapter GPU validation
-is pending.** The historical T4 reports establish execution/counts, not per-box
-numerical equivalence or KITTI detection accuracy. No real paired captures were
-available in the repository/Downloads/attachments search for this update.
+provenance verification separately. The
+[PR #60 experimenter report](https://github.com/filip-labs/Raven/pull/60#issuecomment-6868499971)
+records real T4 numerical/provenance PASS for all 29 detections on frame 000000,
+with zero reported position/dimension/yaw/score differences. This is evidence for
+that tested case, not KITTI accuracy or other samples. The capture files were not
+available locally for independent inspection during RV-028.
 
 ## Matching and tolerances
 
@@ -117,7 +119,7 @@ safety/loading difference is recorded, not presented as byte-for-byte execution
 of the unmodified demo CLI. Both paths use full-scan/range preprocessing rather
 than KittiDataset image-FOV cropping.
 
-## Kaggle workflow — not yet executed for this change
+## Kaggle reproduction workflow
 
 Use the already established external T4 environment and your licensed files.
 See [adapter setup](pointpillars-adapter.md) for compatibility, checkpoint terms,
@@ -236,5 +238,7 @@ missing/duplicate boxes, confidence, angular wrapping, tolerance boundaries,
 global one-to-one assignment and deterministic ties, invalid JSON/frame/provenance,
 empty sets, read-only/no-overwrite behavior, and GPU-free imports. Reference-path
 mocks forbid calls to Raven inference and verify its independent dataset/forward
-boundary. These tests do not satisfy the pending real GPU comparison criterion.
-RV-024 must remain open until a real paired comparison passes and is accepted.
+boundary. CPU tests themselves do not constitute GPU evidence; the separate
+real-run report is linked above.
+The real comparison is recorded in PR #60; further samples and environments
+require their own paired evidence.
