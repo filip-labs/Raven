@@ -45,7 +45,9 @@ Requirements:
   source and SHA256. Reference `pointpillar.pth` SHA256:
   `4c83fc0fa02575b9b3e9dec676f698e7a70bb5a795e89f91df8a96b916fa19e2`.
   [Official model-zoo association and checksum evidence](pointpillars-feasibility.md#evidence-and-its-boundaries)
-  do not establish unrestricted weight-use rights. RV-020 remains open on terms.
+  do not establish unrestricted weight-use rights. The
+  [RV-020 audit](pointpillars-checkpoint-provenance.md) records verified identity
+  and unresolved checkpoint permission scope; keeping RV-020 open is recommended.
 - Your own licensed KITTI input; see [access and split policy](kitti-dataset.md).
   Do not commit or redistribute weights, scans or generated results.
 

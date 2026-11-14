@@ -218,6 +218,10 @@ Keep datasets, downloaded data, pretrained weights, checkpoints, virtual environ
 
 Follow each dataset and pretrained-model provider's license and access terms. Before experiments, record the dataset source, model/weight source, versions, and applicable terms; do not redistribute assets without permission. No project license has been selected. Public visibility alone does not grant an open-source license.
 
+See the [PointPillars checkpoint provenance and rights audit](docs/pointpillars-checkpoint-provenance.md)
+for the official source, verified checksum/configuration, and unresolved weight
+license scope. Apache-2.0 code and KITTI dataset terms are reviewed separately.
+
 ## Author
 
 Filip Cvetković · [Portfolio](https://www.filipzcvetkovic.com)

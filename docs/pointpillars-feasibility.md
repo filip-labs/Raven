@@ -86,6 +86,11 @@ weight provider's applicable terms and KITTI's dataset terms. Keep a provenance
 record with source URL, retrieval date, SHA256, model configuration/revision, and
 applicable terms. The checksum proves byte identity, not licensing rights.
 No project license or redistribution permission is added by this work.
+The [RV-020 checkpoint provenance/rights audit](pointpillars-checkpoint-provenance.md)
+records a fresh official-download checksum check, exact YAML hashes, reviewed
+license/notice sources and the recommendation to retain the unresolved rights
+question. Technical identity is verified; no checkpoint-specific permission scope
+was established.
 
 Official checkpoint source:
 [Google Drive model-zoo file](https://drive.google.com/file/d/1wMxWTpU1qUoY3DsCH31WJmvJxcjFXKlm/view).
