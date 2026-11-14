@@ -12,6 +12,7 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - Deterministic CPU voxel downsampling with mean XYZ/intensity and fixed-origin cells.
 - Statistical outlier removal with an optional CPU SciPy KD-tree backend.
 - Seeded, NumPy-only Gaussian XYZ noise with exact intensity preservation.
+- Ordered preprocessing pipelines with full prevalidation and per-stage provenance.
 - The `raven inspect` CLI for frame summaries.
 - KITTI calibration parsing and reversible point/full-pose box transformations.
 - Validated detection/ground-truth boxes and KITTI `label_2` parsing with source metadata.
@@ -145,6 +146,28 @@ See [the controlled-noise guide](docs/controlled-noise.md) for parameter/seed
 policy, reproducibility limits, KITTI smoke statistics and stage composition.
 This is a simplified synthetic error model, without demonstrated accuracy or
 latency effects.
+
+## Preprocessing pipeline
+
+Compose existing operations in an explicit order, with no hidden defaults:
+
+```python
+from raven.perception.preprocessing.pipeline import run_preprocessing_pipeline
+
+result = run_preprocessing_pipeline(cloud, [
+    {"name": "voxel_downsample", "voxel_size": 0.2},
+    {"name": "noise", "position_std": 0.01, "seed": 42},
+])
+processed_cloud = result.cloud
+metadata = result.to_metadata_dict()
+```
+
+All configurations are validated before the first stage. Repeated stages and an
+empty identity pipeline are supported. Metadata records ordered parameters,
+point counts, frames, stage/total durations and software versions. See the
+[pipeline guide](docs/preprocessing-pipeline.md) for all four canonical stage
+names, error behavior, optional SciPy dependency and read-only KITTI examples.
+No inference runs automatically, and timings establish no accuracy/latency gains.
 
 ## Detector interface
 
