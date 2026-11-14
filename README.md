@@ -12,7 +12,7 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - The `raven inspect` CLI for frame summaries.
 - KITTI calibration parsing and reversible point/full-pose box transformations.
 - Validated detection/ground-truth boxes and KITTI `label_2` parsing with source metadata.
-- An optional interactive Open3D viewer with selectable point coloring and calibrated KITTI ground-truth wireframes.
+- An optional interactive Open3D viewer with selectable point coloring, calibrated KITTI ground truth and saved-prediction overlays.
 - An optional reusable PointPillars detector adapter with lazy external GPU dependencies (Kaggle T4 execution reported).
 - Automated unit tests and CPU-only Python CI.
 
@@ -24,10 +24,11 @@ See [PointPillars feasibility and reproduction](docs/pointpillars-feasibility.md
 for the reported environment, independently checked input/checkpoint hashes, and
 remaining reproduction gaps. The headless experiment runner also completed a
 [successful Kaggle T4 run](https://github.com/filip-labs/Raven/pull/54#issuecomment-6808816795)
-with matching prediction counts; individual box/score equivalence and accuracy
-remain unverified. The reusable adapter now has CPU-tested lifecycle and contract
-behavior and reported T4 execution. Scientific benchmarking, per-box reference
-comparison and a release remain pending.
+with matching prediction counts. The reusable adapter now has CPU-tested lifecycle and contract
+behavior and reported T4 execution. [PR #60](https://github.com/filip-labs/Raven/pull/60#issuecomment-6868499971)
+records zero numerical differences for all 29 predictions on the tested frame.
+Detection accuracy remains unevaluated. Broader validation, scientific benchmarking
+and a release remain pending.
 
 ## Installation
 
@@ -114,7 +115,7 @@ require no GPU packages. See [prediction conversion and JSON](docs/prediction-co
 for CPU-only export/import of validated detections, schema checks and precision limits.
 The [numerical reference validation guide](docs/reference-validation.md) provides
 independent OpenPCDet/Raven capture commands and a CPU-only, provenance-gated
-comparison CLI. The real per-box comparison remains pending.
+comparison CLI. The real T4 comparison passed for the reported frame 000000; other samples remain unverified.
 
 ## Interactive visualization
 
@@ -126,6 +127,8 @@ raven visualize data/kitti/training/velodyne/000000.bin --color intensity
 raven visualize data/kitti/training/velodyne/000000.bin --color uniform --point-size 3.0
 raven visualize data/kitti/training/velodyne/000000.bin --ground-truth
 raven visualize data/kitti/training/velodyne/000001.bin --ground-truth --color uniform
+raven visualize data/kitti/training/velodyne/000000.bin --predictions /path/to/raven_adapter_predictions_000000.json
+raven visualize data/kitti/training/velodyne/000000.bin --ground-truth --predictions /path/to/raven_adapter_predictions_000000.json
 raven visualize --help
 ```
 
@@ -144,9 +147,9 @@ With `--ground-truth`, the viewer loads matching sibling `label_2/FRAME.txt` and
 `calib/FRAME.txt` files, transforms camera bottom-center boxes into the cloud's
 Velodyne frame, and draws their full-orientation corners with twelve edges each.
 Car is green, Pedestrian red, Cyclist blue, and all other classes yellow.
-`DontCare` regions are skipped. Point colors are dimmed to 35% when boxes are
-present so saturated box wires remain distinguishable. Without boxes, existing
-point coloring is unchanged.
+`DontCare` regions are skipped. Point colors are dimmed to 35% while either
+overlay has visible boxes; hiding or filtering all boxes restores the selected
+point colors.
 
 For nonstandard layouts, supply both `--labels PATH` and `--calib PATH` together
 with `--ground-truth`. Scan, label, and calibration filename stems must match;
@@ -162,8 +165,13 @@ and failed window creation produce CLI errors. Empty frames remain valid for
 
 This is a single-frame desktop viewer requiring a graphical session and OpenGL.
 Headless rendering is not supported. Rendering requires Open3D geometry and RGB
-buffers in addition to the original cloud. Detection, model prediction overlays,
-confidence styling, and frame navigation are not implemented. Use the window close control
+buffers in addition to the original cloud. Saved schema-v1 predictions can be
+loaded with `--predictions PATH` without GPU inference packages. Predictions are cyan dashed boxes with heading glyphs; GT
+retains its class colors. F1 shows help, F2/F3 toggle layers, F4 toggles both,
+F5/F6/F7 select Car/Pedestrian/Cyclist, F8 restores all classes, and F9 prints
+visible confidence values to the terminal. See the [overlay guide](docs/visualization.md)
+for frame validation and graphical-test limits. Live detection, 3D text labels
+and frame navigation are not implemented. Use the window close control
 to finish the command; Open3D's built-in navigation controls are not customized.
 
 ## Testing

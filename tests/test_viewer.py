@@ -94,7 +94,9 @@ def renderer(monkeypatch):
             TriangleMesh=SimpleNamespace(create_coordinate_frame=Mock(return_value=axes)),
         ),
         utility=SimpleNamespace(Vector3dVector=lambda values: np.array(values, copy=True)),
-        visualization=SimpleNamespace(Visualizer=lambda: visualizer),
+        visualization=SimpleNamespace(
+            Visualizer=lambda: visualizer, VisualizerWithKeyCallback=lambda: visualizer
+        ),
     )
     monkeypatch.setitem(sys.modules, "open3d", fake)
     return fake, geometry, axes, options, visualizer
