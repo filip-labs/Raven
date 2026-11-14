@@ -11,6 +11,7 @@ Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced I
 - Spatial range filtering that preserves intensity and frame metadata.
 - Deterministic CPU voxel downsampling with mean XYZ/intensity and fixed-origin cells.
 - Statistical outlier removal with an optional CPU SciPy KD-tree backend.
+- Seeded, NumPy-only Gaussian XYZ noise with exact intensity preservation.
 - The `raven inspect` CLI for frame summaries.
 - KITTI calibration parsing and reversible point/full-pose box transformations.
 - Validated detection/ground-truth boxes and KITTI `label_2` parsing with source metadata.
@@ -132,6 +133,18 @@ for the optional CPU SciPy backend. See [the statistical filtering guide](docs/s
 for small-cloud policy, duplicate handling, precision, resource costs, KITTI
 examples and observed smoke-test counts. Sparse valid objects can be removed;
 no accuracy or inference-latency improvement is claimed.
+
+## Controlled noise injection
+
+`inject_noise(cloud, position_std, seed)` adds independent Gaussian XYZ noise
+using a local, explicitly seeded PCG64 generator. Standard deviation is in the
+caller's spatial units (meters for KITTI); intensity, count, row order and metadata
+are preserved. Zero noise returns an exact independent copy. Float64 addition
+and strict float32 range validation prevent silent overflow or clipping.
+See [the controlled-noise guide](docs/controlled-noise.md) for parameter/seed
+policy, reproducibility limits, KITTI smoke statistics and stage composition.
+This is a simplified synthetic error model, without demonstrated accuracy or
+latency effects.
 
 ## Detector interface
 
