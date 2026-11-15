@@ -229,15 +229,15 @@ unit tests work without it. Missing dependencies, invalid files, empty clouds,
 and failed window creation produce CLI errors. Empty frames remain valid for
 `raven inspect`.
 
-This is a single-frame desktop viewer requiring a graphical session and OpenGL.
+This desktop viewer requires a graphical session and OpenGL.
 Headless rendering is not supported. Rendering requires Open3D geometry and RGB
 buffers in addition to the original cloud. Saved schema-v1 predictions can be
 loaded with `--predictions PATH` without GPU inference packages. Predictions are cyan dashed boxes with heading glyphs; GT
 retains its class colors. F1 shows help, F2/F3 toggle layers, F4 toggles both,
 F5/F6/F7 select Car/Pedestrian/Cyclist, F8 restores all classes, and F9 prints
 visible confidence values to the terminal. See the [overlay guide](docs/visualization.md)
-for frame validation and graphical-test limits. Live detection, 3D text labels
-and frame navigation are not implemented. Use the window close control
+for frame validation and graphical-test limits. Live detection and 3D text labels are not implemented.
+Frame navigation and rendered PNG export are available as described below. Use the window close control
 to finish the command; Open3D's built-in navigation controls are not customized.
 
 ## Raw vs processed comparison
@@ -254,6 +254,21 @@ F2 matches from the focused window and F3 restores the paired view/window sizes.
 Install `.[visualization,preprocessing]` for this full example. See the
 [comparison guide](docs/cloud-comparison.md) for configuration, camera linking,
 macOS/headless limitations and read-only KITTI observations.
+
+## Scene navigation and PNG export
+
+```bash
+raven visualize data/kitti/training/velodyne --navigate --start-frame 000000 \
+  --ground-truth --screenshot-dir outputs/screenshots
+```
+
+F10/F11 select previous/next without wrapping, F12 fits the current scene, and
+Shift+F12 exports protected, numbered PNGs containing the frame ID. Comparison
+navigation supports `--compare configs/preprocessing/full.json`; raw and processed
+update together. Saved predictions use `--predictions-dir` with matching
+`FRAME.json` files. Single-frame screenshots opt in with `--screenshot-dir`.
+See the [navigation/export guide](docs/scene-navigation.md) for supported modes,
+frame matching, camera behavior, macOS evidence and a 3–5 minute demo.
 
 ## Testing
 

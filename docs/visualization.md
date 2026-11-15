@@ -20,7 +20,17 @@ shared color scale. `--compare` cannot be combined with `--ground-truth` or
 `--predictions`; select the overlay modes below to inspect those layers. No
 inference is performed by either path.
 
-## Four CLI modes
+## Navigation and screenshot export
+
+`raven visualize SPLIT/velodyne --navigate --ground-truth --screenshot-dir outputs/screenshots`
+loads one frame at a time. F10/F11 navigate, F12 fits the current scene and
+Shift+F12 exports the real framebuffer without overwriting existing files.
+Navigation overlays use frame-matched sibling labels/calibration and optionally
+`--predictions-dir`. Explicit single-frame overlay paths are rejected in navigation.
+See the [scene guide](scene-navigation.md) for complete commands, supported
+comparison navigation, filenames, error behavior and native macOS validation.
+
+## Four single-frame overlay modes
 
 Run from the repository root with your own licensed files. Prediction paths below
 are examples; the capture is not included in the repository.
@@ -197,7 +207,7 @@ Synthetic predictions are not the unavailable Kaggle capture. Pan behavior and
 other platforms/display drivers have not been separately exercised in this update.
 No screenshots, datasets, checkpoints or prediction captures are committed.
 
-This remains a single-frame graphical OpenGL viewer. No headless rendering,
-inference, live detection, frame navigation, AP metrics or 3D confidence text UI
-is added. Line visibility depends on zoom, occlusion, resolution and driver;
+This remains a legacy GLFW/OpenGL desktop viewer. Headless rendering, inference, live detection, AP metrics and 3D confidence
+text remain unsupported. Frame navigation and PNG export are documented in the
+[scene guide](scene-navigation.md). Line visibility depends on zoom, occlusion, resolution and driver;
 the initial camera fits the LiDAR scene, so zoom in for small/distant boxes.

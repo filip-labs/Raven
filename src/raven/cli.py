@@ -60,6 +60,17 @@ def main(argv: Sequence[str] | None = None) -> None:
         metavar="CONFIG.json",
         help="Compare raw/processed using an ordered pipeline stage JSON array",
     )
+    visualize.add_argument(
+        "--navigate", action="store_true", help="Navigate a Velodyne directory with F10/F11"
+    )
+    visualize.add_argument("--start-frame", help="Starting frame ID (requires --navigate)")
+    visualize.add_argument(
+        "--predictions-dir", help="Frame-matched FRAME.json directory (requires --navigate)"
+    )
+    visualize.add_argument(
+        "--screenshot-dir",
+        help="Enable Shift+F12 PNG export to this directory (navigation default: outputs/screenshots)",
+    )
     visualize.add_argument("--predictions", help="Saved schema-v1 KITTI prediction JSON")
     visualize.add_argument("--labels", help="Explicit label_2 file (requires --ground-truth)")
     visualize.add_argument("--calib", help="Explicit calibration file (requires --ground-truth)")
@@ -81,11 +92,20 @@ def main(argv: Sequence[str] | None = None) -> None:
     if (
         args.command == "visualize"
         and args.compare is not None
-        and (args.ground_truth or args.predictions is not None)
+        and (args.ground_truth or args.predictions is not None or args.predictions_dir is not None)
     ):
         parser.error(
             "--compare cannot be combined with --ground-truth or --predictions; use the overlay viewer separately"
         )
+    if args.command == "visualize":
+        if not args.navigate and (args.start_frame is not None or args.predictions_dir is not None):
+            parser.error("--start-frame and --predictions-dir require --navigate")
+        if args.navigate and (
+            args.predictions is not None or args.labels is not None or args.calib is not None
+        ):
+            parser.error(
+                "Navigation uses frame-matched sibling labels/calib and --predictions-dir; explicit single-frame files are unsupported"
+            )
     try:
         if args.command == "inspect-calib":
             import numpy as np
@@ -133,6 +153,38 @@ def main(argv: Sequence[str] | None = None) -> None:
                 )
             )
             return
+        if args.command == "visualize" and args.navigate:
+            from raven.perception.visualization.scenes import FrameSequence
+
+            stages = None
+            if args.compare is not None:
+                with Path(args.compare).open(encoding="utf-8") as stream:
+                    stages = json.load(
+                        stream, object_pairs_hook=_config_object, parse_constant=_config_constant
+                    )
+            sequence = FrameSequence(
+                args.path,
+                start_frame=args.start_frame,
+                ground_truth=args.ground_truth,
+                predictions_dir=args.predictions_dir,
+                stages=stages,
+            )
+            active = sequence.active
+            options = {
+                "color": args.color,
+                "point_size": args.point_size,
+                "sequence": sequence,
+                "screenshot_dir": args.screenshot_dir or "outputs/screenshots",
+            }
+            if args.compare is not None:
+                from raven.perception.visualization.comparison import view_cloud_comparison
+
+                view_cloud_comparison(active.cloud, active.processed, **options)
+            else:
+                from raven.perception.visualization.viewer import view_point_cloud
+
+                view_point_cloud(active.cloud, **options)
+            return
         cloud = load_kitti_bin(args.path)
         if args.command == "visualize":
             if args.compare is not None:
@@ -145,7 +197,15 @@ def main(argv: Sequence[str] | None = None) -> None:
                     )
                 result = run_preprocessing_pipeline(cloud, stages)
                 view_cloud_comparison(
-                    cloud, result.cloud, color=args.color, point_size=args.point_size
+                    cloud,
+                    result.cloud,
+                    color=args.color,
+                    point_size=args.point_size,
+                    **(
+                        {"screenshot_dir": args.screenshot_dir}
+                        if args.screenshot_dir is not None
+                        else {}
+                    ),
                 )
                 return
             from raven.perception.visualization.viewer import view_point_cloud
@@ -163,6 +223,8 @@ def main(argv: Sequence[str] | None = None) -> None:
                 overlays["predictions"] = load_detections(
                     args.predictions, expected_frame_id=cloud.frame_id
                 )
+            if args.screenshot_dir is not None:
+                overlays["screenshot_dir"] = args.screenshot_dir
             view_point_cloud(cloud, color=args.color, point_size=args.point_size, **overlays)
             return
     except (OSError, ValueError, TypeError, RuntimeError) as exc:

@@ -50,3 +50,6 @@ dist/
 .idea/
 *.iml
 .DS_Store
+
+# Rendered Raven screenshots, including explicit export directories
+raven_*.png

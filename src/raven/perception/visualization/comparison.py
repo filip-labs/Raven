@@ -11,6 +11,7 @@ import numpy as np
 
 from raven.core.point_cloud import PointCloud
 from raven.perception.visualization.coloring import point_colors
+from raven.perception.visualization.scenes import SCENE_HELP, bind_scene_controls
 
 
 @dataclass(frozen=True)
@@ -107,7 +108,13 @@ class _CameraLink:
 
 
 def view_cloud_comparison(
-    raw: PointCloud, processed: PointCloud, *, color="distance", point_size=2.0
+    raw: PointCloud,
+    processed: PointCloud,
+    *,
+    color="distance",
+    point_size=2.0,
+    sequence=None,
+    screenshot_dir=None,
 ) -> None:
     """Show equal-size side-by-side GLFW windows with linked legacy cameras.
 
@@ -123,6 +130,10 @@ def view_cloud_comparison(
         raise ValueError("point size must be finite and between 1 and 25 pixels") from exc
     if not np.isfinite(size) or not 1 <= size <= 25:
         raise ValueError("point size must be finite and between 1 and 25 pixels")
+    if sequence is not None and (
+        raw is not sequence.active.cloud or processed is not sequence.active.processed
+    ):
+        raise ValueError("Comparison clouds must be the active sequence pair")
     data = prepare_comparison(raw, processed, color)
     if threading.current_thread() is not threading.main_thread():
         raise RuntimeError("Open3D comparison must run on the main thread in a graphical desktop")
@@ -139,14 +150,25 @@ def view_cloud_comparison(
         raise RuntimeError(
             "Open3D comparison requires a graphical desktop; headless rendering is not supported"
         )
-    titles = [
-        f"RAW {data.raw_count} | {raw.frame_id}",
-        f"PROCESSED {data.processed_count} | {-data.reduction_percent:+.2f}%"
-        + (" | EMPTY" if not processed.count else ""),
-    ]
+
+    def get_titles():
+        if sequence is not None:
+            return [
+                f"{sequence.status()} RAW {data.raw_count}",
+                f"{sequence.status()} PROC {data.processed_count} ({-data.reduction_percent:+.1f}%)"
+                + (" EMPTY" if not processed.count else ""),
+            ]
+        return [
+            f"RAW {data.raw_count} | {raw.frame_id}",
+            f"PROCESSED {data.processed_count} | {-data.reduction_percent:+.2f}%"
+            + (" | EMPTY" if not processed.count else ""),
+        ]
+
+    titles = get_titles()
     visualizers = []
     failure = None
     cleanup_errors = []
+    point_geometries = [None, None]
     try:
         for index, (cloud, colors) in enumerate(
             zip((raw, processed), (data.raw_colors, data.processed_colors), strict=True)
@@ -164,6 +186,7 @@ def view_cloud_comparison(
                 # Native bindings can require writable float64 buffers. Own both.
                 geometry.points = o3d.utility.Vector3dVector(cloud.points[:, :3].astype(np.float64))
                 geometry.colors = o3d.utility.Vector3dVector(colors.copy())
+                point_geometries[index] = geometry
                 if not vis.add_geometry(geometry):
                     raise RuntimeError("Open3D could not add comparison point geometry")
             axes = o3d.geometry.TriangleMesh.create_coordinate_frame(size=2.0, origin=[0, 0, 0])
@@ -176,12 +199,59 @@ def view_cloud_comparison(
             options.background_color = np.array([0.05, 0.05, 0.05])
         link = _CameraLink(visualizers, data)
 
+        def reset_current():
+            link.bounds = data.bounds_min.tolist(), data.bounds_max.tolist()
+            link.apply(link.initial, size)
+
+        def move(delta, source):
+            nonlocal raw, processed, data, titles
+            frame = sequence.move(delta)
+            if frame is None:
+                return
+            camera = link._read(visualizers[source])
+            pixels = visualizers[source].get_render_option().point_size
+            raw, processed = frame.cloud, frame.processed
+            data = prepare_comparison(raw, processed, color)
+            titles = get_titles()
+            for index, (cloud, colors) in enumerate(
+                zip((raw, processed), (data.raw_colors, data.processed_colors), strict=True)
+            ):
+                vis = visualizers[index]
+                if point_geometries[index] is not None:
+                    if not vis.remove_geometry(point_geometries[index], reset_bounding_box=False):
+                        raise RuntimeError("Open3D could not remove previous frame geometry")
+                    point_geometries[index] = None
+                if cloud.count:
+                    geometry = o3d.geometry.PointCloud()
+                    geometry.points = o3d.utility.Vector3dVector(
+                        cloud.points[:, :3].astype(np.float64)
+                    )
+                    geometry.colors = o3d.utility.Vector3dVector(colors.copy())
+                    if not vis.add_geometry(geometry, reset_bounding_box=False):
+                        raise RuntimeError("Open3D could not add new frame geometry")
+                    point_geometries[index] = geometry
+                if not vis.create_window(
+                    window_name=titles[index], width=640, height=720, left=30 + index * 660, top=60
+                ):
+                    raise RuntimeError("Open3D could not update comparison frame title")
+            # Preserve the previous complete camera/bounds. Reset now fits the NEW pair.
+            reset_frame = link.initial["trajectory"][0]
+            reset_frame["boundingbox_min"] = data.bounds_min.tolist()
+            reset_frame["boundingbox_max"] = data.bounds_max.tolist()
+            reset_frame["lookat"] = ((data.bounds_min + data.bounds_max) / 2).tolist()
+            link.apply(camera, pixels)
+            print(
+                f"Active frame: {sequence.status()} | RAW {raw.count} | PROCESSED {processed.count} | reduction {data.reduction_percent:.2f}%"
+            )
+
         def callback(source, key):
             def on_key(vis, action, mods):
                 if action != 1 or mods != 0:
                     return False
                 if key == 290:
                     print(HELP)
+                    if sequence is not None or screenshot_dir is not None:
+                        print(SCENE_HELP)
                 elif key == 291:
                     link.synchronize(source)
                 else:
@@ -194,7 +264,7 @@ def view_cloud_comparison(
                             top=60,
                         ):
                             raise RuntimeError("Open3D could not restore matched window sizes")
-                    link.apply(link.initial, size)
+                    reset_current()
                 return False
 
             return on_key
@@ -202,6 +272,22 @@ def view_cloud_comparison(
         for index, vis in enumerate(visualizers):
             for key in range(290, 293):
                 vis.register_key_action_callback(key, callback(index, key))
+        if sequence is not None or screenshot_dir is not None:
+            for index, vis in enumerate(visualizers):
+                bind_scene_controls(
+                    vis,
+                    get_frame_id=lambda: raw.frame_id,
+                    output_dir=screenshot_dir or "outputs/screenshots",
+                    move=(lambda delta, source=index: move(delta, source))
+                    if sequence is not None
+                    else None,
+                    reset=reset_current,
+                    renderers=visualizers,
+                    roles=("raw", "processed"),
+                    before_export=lambda source=index: link.synchronize(source),
+                )
+            if sequence is not None:
+                print(f"Active frame: {sequence.status()}")
         print(
             f"RAW {data.raw_count} | PROCESSED {data.processed_count} | reduction {data.reduction_percent:.2f}%"
         )

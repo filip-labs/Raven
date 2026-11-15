@@ -11,6 +11,18 @@ readers and CPU tests need no renderer. SciPy is needed only when a configured
 statistical stage processes at least two points. Preprocessing runs on CPU and
 does not import or invoke PointPillars, CUDA, torch, OpenPCDet or spconv.
 
+## Navigation and export
+
+Add `--navigate` when the input is a Velodyne directory, optionally selecting
+`--start-frame 000000`. RAW and PROCESSED update together; processing occurs once
+per selected frame. F10/F11 navigate, F12 fits the current pair, and Shift+F12
+exports a numbered RAW/PROCESSED PNG pair. Navigation defaults to
+`outputs/screenshots`; use `--screenshot-dir` to choose another directory or to
+enable export for a single frame. F1/F2/F3 retain comparison behavior.
+See [scene navigation and export](scene-navigation.md) for frame matching, camera
+persistence, limitations and native macOS checks. Comparison plus overlays remains
+explicitly unsupported.
+
 ## CLI and configurations
 
 ```bash
@@ -45,7 +57,8 @@ occurrence. Unknown names, missing/extra keys, invalid values, duplicate JSON ke
 nonstandard NaN/Infinity tokens, malformed JSON and missing files are errors.
 All stages are prevalidated before processing and before opening windows.
 Data-dependent/backend failures retain the pipeline's stage diagnostics.
-No preprocessing is recomputed during navigation, matching or reset.
+No preprocessing is recomputed during camera movement, matching or reset.
+Frame selection in navigation mode runs the pipeline once for the new frame.
 
 `--color distance|intensity|uniform` and `--point-size 1..25` are supported.
 `--compare` cannot be combined with `--ground-truth` or `--predictions`; these
