@@ -56,6 +56,11 @@ OpenPCDet dependency is added to the standard Raven installation or CPU CI.
 The reported Kaggle T4/OpenPCDet combination is evidence for that experiment;
 compatibility with other GPU images is not guaranteed.
 
+For editable-install routing checks, safe activation and multiple-checkout guidance,
+see [local development setup](docs/local-development.md). The
+[M0–M4 remediation report](docs/qa/m0-m4-remediation-report.md) separates fresh
+CPU/native macOS checks from historical GPU evidence and outstanding verification gaps.
+
 ## CLI usage
 
 Obtain a KITTI Velodyne frame through the official [KITTI 3D Object Detection benchmark](https://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d) and store it locally under the ignored `data/` directory:

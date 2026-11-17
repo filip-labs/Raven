@@ -171,3 +171,13 @@ def test_viewer_batches_box_wireframes_and_preserves_point_colors(renderer, mode
     assert visualizer.add_geometry.call_args_list[-1].kwargs == {"reset_bounding_box": False}
     visualizer.run.assert_called_once()
     visualizer.destroy_window.assert_called_once()
+
+
+def test_interactive_callbacks_leave_native_point_size_and_close_keys_unbound(renderer, tmp_path):
+    """Raven must not swallow the backend's =/- and Q/Escape actions."""
+    _, _, _, _, visualizer = renderer
+    view_point_cloud(PointCloud(np.array([[1, 2, 3, 0.5]]), "000000"), screenshot_dir=tmp_path)
+    keys = {call.args[0] for call in visualizer.register_key_action_callback.call_args_list}
+    assert {290, 298, 299, 300, 301} <= keys  # Raven help/overlays/navigation/export active.
+    assert keys.isdisjoint({61, 45, 81, 256})  # GLFW equal, minus, Q, Escape.
+    visualizer.register_key_callback.assert_not_called()
