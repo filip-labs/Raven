@@ -56,12 +56,12 @@ def scene(tmp_path, calibration):
 @pytest.mark.parametrize(
     "label,color",
     [
-        ("Car", (0, 1, 0)),
-        ("Pedestrian", (1, 0, 0)),
-        ("Cyclist", (0, 0, 1)),
-        ("Van", (1, 1, 0)),
-        ("Truck", (1, 1, 0)),
-        ("Unknown", (1, 1, 0)),
+        ("Car", (0.0, 0.75, 1.0)),
+        ("Pedestrian", (0.8, 0.4, 1.0)),
+        ("Cyclist", (1.0, 0.8, 0.2)),
+        ("Van", (0.9, 0.9, 0.9)),
+        ("Truck", (0.9, 0.9, 0.9)),
+        ("Unknown", (0.9, 0.9, 0.9)),
     ],
 )
 def test_class_colors(label, color):
@@ -75,7 +75,7 @@ def test_eight_corners_twelve_unique_edges_and_no_mutation(box):
     assert edges.min() == 0 and edges.max() == 7
     assert len({tuple(sorted(pair)) for pair in edges.tolist()}) == 12
     np.testing.assert_array_equal(np.bincount(edges.flatten(), minlength=8), [3] * 8)
-    np.testing.assert_array_equal(colors, [[0, 1, 0]] * 12)
+    np.testing.assert_array_equal(colors, [class_color("Car")] * 12)
     lengths = np.linalg.norm(points[edges[:, 0]] - points[edges[:, 1]], axis=1)
     np.testing.assert_allclose(sorted(lengths), [2] * 4 + [4] * 4 + [6] * 4)
     points[0] += 100
@@ -135,6 +135,7 @@ def test_batch_offsets_and_empty_boxes(box):
     second = replace(box, center_xyz=box.center_xyz + [1, 2, 3])
     points, edges, colors = box_wireframes([box, second], VELODYNE_FRAME)
     assert points.shape == (16, 3) and colors.shape == (24, 3)
+    np.testing.assert_array_equal(colors, [[1.0, 0.2, 0.2]] * 24)
     assert edges[:12].max() < 8 and edges[12:].min() >= 8 and edges[12:].max() == 15
     empty = box_wireframes([], VELODYNE_FRAME)
     assert [array.shape for array in empty] == [(0, 3), (0, 2), (0, 3)]
