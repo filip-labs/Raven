@@ -14,6 +14,8 @@ from raven.perception.data.kitti_calibration import (
 )
 
 # OrientedBox3D lower face 0..3, upper face 4..7, then corresponding vertical edges.
+GROUND_TRUTH_COLOR = (1.0, 0.2, 0.2)  # Solid red KITTI reference boxes.
+
 BOX_EDGES = (
     (0, 1),
     (1, 2),
@@ -31,10 +33,12 @@ BOX_EDGES = (
 
 
 def class_color(label: str) -> tuple[float, float, float]:
-    """Car green, Pedestrian red, Cyclist blue; all other names yellow."""
-    return {"Car": (0.0, 1.0, 0.0), "Pedestrian": (1.0, 0.0, 0.0), "Cyclist": (0.0, 0.0, 1.0)}.get(
-        label, (1.0, 1.0, 0.0)
-    )
+    """High-contrast PointPillars palette; avoids red/green LiDAR point colors."""
+    return {
+        "Car": (0.0, 0.75, 1.0),
+        "Pedestrian": (0.8, 0.4, 1.0),
+        "Cyclist": (1.0, 0.8, 0.2),
+    }.get(label, (0.9, 0.9, 0.9))
 
 
 def wireframe_from_corners(corners: np.ndarray, label: str):
@@ -65,7 +69,8 @@ def box_wireframes(boxes: Iterable[OrientedBox3D], coordinate_frame: str):
                 f"Box frame {box.coordinate_frame!r} does not match cloud frame "
                 f"{coordinate_frame!r}; transform boxes before rendering"
             )
-        points, edges, rgb = wireframe_from_corners(box.corners, box.label)
+        points, edges, _ = wireframe_from_corners(box.corners, box.label)
+        rgb = np.tile(GROUND_TRUTH_COLOR, (len(edges), 1))
         vertices.append(points)
         lines.append(edges + index * 8)
         colors.append(rgb)
