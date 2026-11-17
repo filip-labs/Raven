@@ -7,7 +7,7 @@ F1 help/legend | F2 ground truth | F3 predictions | F4 both on/off
 F5 Car only | F6 Pedestrian only | F7 Cyclist only | F8 all classes
 F9 print visible prediction confidence/coordinates to the terminal
 GT: solid Car green / Pedestrian red / Cyclist blue / others yellow
-Predictions: cyan dashed edges + interior heading arrow/crossbar
+Predictions: same class colors, dashed edges + heading arrow/crossbar
 Mouse navigation and Open3D's other keys remain unchanged.
 """
 
