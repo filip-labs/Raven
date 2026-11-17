@@ -6,8 +6,9 @@ HELP = """Raven overlays (focus the viewer; macOS may require Fn + F-key):
 F1 help/legend | F2 ground truth | F3 predictions | F4 both on/off
 F5 Car only | F6 Pedestrian only | F7 Cyclist only | F8 all classes
 F9 print visible prediction confidence/coordinates to the terminal
-GT: solid Car green / Pedestrian red / Cyclist blue / others yellow
-Predictions: same class colors, dashed edges + heading arrow/crossbar
+GT: solid red KITTI reference boxes (all classes)
+Predictions: dashed Car cyan-blue / Pedestrian purple / Cyclist amber / others light gray
+Predictions include an interior heading arrow/crossbar
 Mouse navigation and Open3D's other keys remain unchanged.
 """
 
