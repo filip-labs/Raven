@@ -166,7 +166,7 @@ def test_viewer_batches_box_wireframes_and_preserves_point_colors(renderer, mode
     np.testing.assert_allclose(geometry.colors, point_colors(cloud, mode) * 0.35)
     np.testing.assert_array_equal(wireframe.points, box.corners)
     assert wireframe.lines.shape == (12, 2)
-    np.testing.assert_array_equal(wireframe.colors, [[1, 0, 0]] * 12)
+    np.testing.assert_array_equal(wireframe.colors, [[1.0, 0.2, 0.2]] * 12)
     assert visualizer.add_geometry.call_args_list[-1].args == (wireframe,)
     assert visualizer.add_geometry.call_args_list[-1].kwargs == {"reset_bounding_box": False}
     visualizer.run.assert_called_once()

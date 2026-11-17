@@ -14,6 +14,8 @@ from raven.perception.data.kitti_calibration import (
 )
 
 # OrientedBox3D lower face 0..3, upper face 4..7, then corresponding vertical edges.
+GROUND_TRUTH_COLOR = (1.0, 0.2, 0.2)  # Solid red KITTI reference boxes.
+
 BOX_EDGES = (
     (0, 1),
     (1, 2),
@@ -31,10 +33,12 @@ BOX_EDGES = (
 
 
 def class_color(label: str) -> tuple[float, float, float]:
-    """Car green, Pedestrian red, Cyclist blue; all other names yellow."""
-    return {"Car": (0.0, 1.0, 0.0), "Pedestrian": (1.0, 0.0, 0.0), "Cyclist": (0.0, 0.0, 1.0)}.get(
-        label, (1.0, 1.0, 0.0)
-    )
+    """High-contrast PointPillars palette; avoids red/green LiDAR point colors."""
+    return {
+        "Car": (0.0, 0.75, 1.0),
+        "Pedestrian": (0.8, 0.4, 1.0),
+        "Cyclist": (1.0, 0.8, 0.2),
+    }.get(label, (0.9, 0.9, 0.9))
 
 
 def wireframe_from_corners(corners: np.ndarray, label: str):
@@ -65,7 +69,8 @@ def box_wireframes(boxes: Iterable[OrientedBox3D], coordinate_frame: str):
                 f"Box frame {box.coordinate_frame!r} does not match cloud frame "
                 f"{coordinate_frame!r}; transform boxes before rendering"
             )
-        points, edges, rgb = wireframe_from_corners(box.corners, box.label)
+        points, edges, _ = wireframe_from_corners(box.corners, box.label)
+        rgb = np.tile(GROUND_TRUTH_COLOR, (len(edges), 1))
         vertices.append(points)
         lines.append(edges + index * 8)
         colors.append(rgb)
@@ -119,8 +124,6 @@ def load_ground_truth_boxes(
     return tuple(boxes)
 
 
-PREDICTION_COLOR = (0.0, 1.0, 1.0)
-
 
 def prediction_corners(detection, coordinate_frame: str):
     """Use the existing corner geometry with an exact +Z rotation; no frame transform."""
@@ -139,15 +142,17 @@ def prediction_corners(detection, coordinate_frame: str):
 
 
 def prediction_wireframes(predictions, coordinate_frame: str):
-    """Cyan dashed box edges plus an interior heading arrow and center crossbar.
+    """Class-colored dashed box edges plus an interior heading arrow and center crossbar.
 
     Four exact collinear dash segments per edge. The glyph stays inside the box,
     helping distinguish coincident layers without moving or inflating the box.
     """
     segments = []
+    segment_colors = []
     for detection in predictions:
         corners = prediction_corners(detection, coordinate_frame)
         points, edges, _ = wireframe_from_corners(corners, detection.label)
+        before = len(segments)
         for start, end in edges:
             vector = points[end] - points[start]
             for part in range(0, 8, 2):
@@ -167,8 +172,9 @@ def prediction_wireframes(predictions, coordinate_frame: str):
                 [center - 0.2 * width_axis, center + 0.2 * width_axis],
             ]
         )
+        segment_colors.extend([class_color(detection.label)] * (len(segments) - before))
     if not segments:
         return np.empty((0, 3)), np.empty((0, 2), dtype=np.int32), np.empty((0, 3))
     vertices = np.asarray(segments).reshape(-1, 3)
     lines = np.arange(len(vertices), dtype=np.int32).reshape(-1, 2)
-    return vertices, lines, np.tile(PREDICTION_COLOR, (len(lines), 1))
+    return vertices, lines, np.asarray(segment_colors, dtype=np.float64)
