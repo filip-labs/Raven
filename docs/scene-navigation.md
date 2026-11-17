@@ -217,3 +217,34 @@ inference/end-to-end latency result.
 5. Export the matching RAW/PROCESSED pair, explain the explicit pipeline and its
    provenance, then close. Reduced point count/visible geometry changes are not
    claims about detector quality or total latency (about 45 seconds).
+
+## Verified backend controls and macOS input limitations
+
+Native camera, point-size and close controls belong to legacy Open3D, not Raven.
+The [Open3D v0.20.0 callbacks](https://github.com/isl-org/Open3D/blob/v0.20.0/cpp/open3d/visualization/visualizer/VisualizerCallback.cpp)
+handle unshifted GLFW `EQUAL` as point-size +1 and `MINUS` as -1. On the tested
+ABC keyboard layout, use the physical `=` key without Shift, or `-` without
+Shift. Shift+`=` / Shift+`-` change **line width**, not point size. A printed `+`
+label in general viewer instructions can therefore be misleading. Raven's
+`--point-size` initial-value validation (1–25) is separate from the backend's
+interactive limits.
+
+Open3D provides Ctrl+left-drag or middle-button drag for camera pan, plain
+left-drag for orbit, and wheel scrolling for zoom. On macOS the system may
+intercept Ctrl-click; use an appropriate physical mouse/middle drag when needed.
+Raven does not implement a parallel mouse handler.
+
+The remediation executed native `-` (3 → 2), Escape, Q, and the native close
+button successfully. Native automation `equal` still did not change point size;
+its modifier-only Ctrl hold was rejected, and its drag API has no modifier or
+mouse-button parameter. Physical unshifted `=` and Ctrl/middle drag therefore
+remain **manual verification required**, rather than confirmed Raven defects.
+The ABC layout was read without changing system settings. CPU regression tests
+ensure Raven does not register callbacks for `=`, `-`, Q or Escape; these tests
+protect delegation and do not simulate or prove native backend behavior.
+
+Fresh bounded sessions also rechecked F1–F9, F10/F11, F12, Shift+F12, comparison
+F1–F3, recovery after export-path failure, and actual framebuffer PNGs. Comparison
+orbit/pan/zoom probes invoked real ViewControl methods through explicitly marked
+audit-only keys; they are not product controls or proof of physical modifier-drag.
+See the [remediation report](qa/m0-m4-remediation-report.md) for exact scope/results.

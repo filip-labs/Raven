@@ -135,7 +135,8 @@ captures: choose a fresh output directory, as below. Run the two scripts as
 ```bash
 cd /kaggle/working/Raven
 git fetch origin
-git switch feat/rv-024-reference-validation
+git switch --detach b6ae4d4ff563254c4263cddbbf54051306cd44ee
+# Known reviewed M0–M4 source; both processes must use this same clean revision.
 python -m pip install -e .
 git status --short
 git -C /kaggle/working/OpenPCDet rev-parse HEAD
@@ -242,3 +243,84 @@ boundary. CPU tests themselves do not constitute GPU evidence; the separate
 real-run report is linked above.
 The real comparison is recorded in PR #60; further samples and environments
 require their own paired evidence.
+
+## November 17–18 artifact recovery and revalidation status
+
+The [original experimenter report](https://github.com/filip-labs/Raven/pull/60#issuecomment-6868499971)
+is retained as historical external evidence. RV-024 was already closed when this
+remediation started; neither its issue nor board status was changed. This task
+has **not independently replayed** its GPU result.
+
+| Artifact | Historical report SHA256 | Recovery |
+| --- | --- | --- |
+| OpenPCDet reference | `208c130f67adabfc412c55e39f9b9a19dd988b59ea8fd98b5a8ff0d977a50636` | Not found |
+| Raven candidate | `0816479c95c557ba35206cfb6ec466b26297790375c7cae7af984f5cc467e1b0` | Not found |
+| Comparison report | `69c17a27bdada39c0ef7a02df14fb8803d41ab64fd11d32be4648238bd873818` | Not found |
+
+The separately recovered local `raven_adapter_predictions_000000.json` hashes to
+`cbcca87d066c66843774cce94bb3129254245a4498290d5a9d25e4a45aeff5d3`
+(the full 64-character checksum). It validates as 29 detections: Car 4,
+Pedestrian 19, Cyclist 6. Its declared creation time is
+2026-11-14T00:37:57.248922+00:00, later than the report's 00:29:30Z comment;
+run ID `1c5ea1beb0b6467499293096ef78643b`. It declares Raven
+`59c0916d697ab56c72d767645e70a6b9dc41eb9a`, the pinned OpenPCDet revision above,
+and the expected scan/checkpoint hashes. The pinned upstream YAML was retrieved
+independently and hashes to its declared
+`170a9ffe76cfd8509d1044cfbcf1cbd44c5d320fda81bf0089a8d5efaf1c91c8`.
+
+The bytes differ from the recorded candidate. Declared timestamps suggest a
+later capture, but cannot establish whether a separate execution, reserialization
+or another cause explains it. Count equality and matching revision/configuration
+are insufficient to infer numerical equivalence. No tampering or model regression
+is inferred. Accessible Desktop, Downloads, Documents and attachment artifacts
+were searched by relevant names; no original pair/report was recovered. This is
+not an exhaustive claim about cloud storage, deleted sessions or inaccessible files.
+A separately identified read-only copy and SHA manifest are preserved in ignored
+local remediation outputs; captures are not distributed with Raven.
+
+### External execution still required
+
+The commands in **Kaggle reproduction workflow** above now pin an available
+reviewed Raven revision rather than a deleted remote feature branch. They are a
+revalidation procedure, not a claim this task ran GPU inference. Use an already
+provisioned, trusted NVIDIA environment and your authorized scan/checkpoint. This
+remediation does not download weights, allocate GPUs or set up remote infrastructure.
+The checkpoint checksum identifies bytes, not permission to use/redistribute them;
+review [checkpoint provenance and rights](pointpillars-checkpoint-provenance.md).
+
+The current capture declares Python 3.13.16, PyTorch 2.11.0+cu130, CUDA toolkit
+13.0 (V13.0.88), NumPy 2.1.3, spconv-cu126 2.3.8, cumm-cu126 0.7.11,
+OpenPCDet package `0.6.0+233f849+py59c0916`, Tesla T4 / capability 7.5,
+and driver 580.178.04. The source revision is authoritative above; the extra
+package suffix is recorded, not silently normalized away. A complete original
+environment lock and notebook are unavailable. These mixed CUDA package versions
+are historical evidence, not a supported universal install recipe; provision/build
+compatibility must be verified externally. Do not install them into the Mac venv.
+
+Before **each** new fresh subprocess, set `CUMM_DISABLE_JIT=1`,
+`SPCONV_DISABLE_JIT=1`, `TORCH_CUDA_ARCH_LIST=7.5` as in the workflow. Require the
+same upstream tracked diff in both runs. The recovered capture declares only
+`pcdet/datasets/__init__.py` modified, diff SHA256
+`b09551855dbda24e7c6b8e1c53974d27b91a00133c9406d12d0bfbbaea11d823`.
+The original patch bytes are unavailable. If `av2` blocks KITTI imports, explicitly
+review/back up the external Kaggle file and remove only the optional Argo2 import
+and mapping registration described in [feasibility](pointpillars-feasibility.md).
+Never silently patch Raven/upstream; preserve the actual patch and its hash.
+A new reviewed patch may have a different hash from the unrecovered old patch;
+both fresh runs must record their actual identical diff, not fabricate the old one.
+
+Use a fresh uniquely named output directory in the workflow. Save stdout/stderr
+for both inference commands and the comparator. Before ending the GPU session,
+export all three JSONs, notebook/logs, `python -m pip freeze`, `nvidia-smi`,
+`nvcc --version`, Git SHAs/status, config/base-config files, and
+`git -C /kaggle/working/OpenPCDet diff --binary HEAD`. Record original return
+codes and run `sha256sum` on the three JSON files; retain a read-only private copy
+with that manifest. If the comparator exits 1, retain the FAIL report and actual
+errors; do not alter thresholds or overwrite files to achieve agreement. Use the
+documented default tolerances unless predeclaring a justified alternative.
+
+Success requires independent run IDs/entrypoints, matching critical provenance,
+`numerical_pass`, `provenance_pass`, and overall `pass`, not 29 matching counts or
+a self-reference comparison. Fresh checks remain **BLOCKED** here by the absent
+trusted NVIDIA execution environment and unrecovered authentic historical pair.
+This procedure closes the documentation gap, not the GPU verification gap.

@@ -390,3 +390,12 @@ def test_linux_without_display_does_not_initialize_renderer(renderer, monkeypatc
         view_cloud_comparison(cloud(), cloud())
     for vis in renderer[0]:
         vis.create_window.assert_not_called()
+
+
+def test_comparison_callbacks_preserve_native_point_size_and_close_keys(renderer, tmp_path):
+    """Both windows delegate native size/close actions instead of shadowing them."""
+    visualizers, _ = renderer
+    view_cloud_comparison(cloud(), cloud(), screenshot_dir=tmp_path)
+    for visualizer in visualizers:
+        assert {290, 291, 292, 299, 300, 301} <= visualizer.callbacks.keys()
+        assert visualizer.callbacks.keys().isdisjoint({61, 45, 81, 256})
