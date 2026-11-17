@@ -22,7 +22,7 @@ from raven.perception.detection.predictions import detections_to_document, save_
 from raven.perception.visualization import viewer
 from raven.perception.visualization.boxes import (
     BOX_EDGES,
-    PREDICTION_COLOR,
+    class_color,
     load_ground_truth_boxes,
     prediction_corners,
     prediction_wireframes,
@@ -87,7 +87,7 @@ def test_dashed_style_does_not_offset_edges_and_glyph_stays_inside():
     corners = prediction_corners(box, "kitti_velodyne")
     points, edges, colors = prediction_wireframes([box], "kitti_velodyne")
     assert len(edges) == 52  # 12 edges * four dashes + four interior glyph segments.
-    np.testing.assert_array_equal(colors, np.tile(PREDICTION_COLOR, (52, 1)))
+    np.testing.assert_array_equal(colors, np.tile(class_color("Car"), (52, 1)))
     for index, (a, b) in enumerate(BOX_EDGES):
         for part in range(4):
             endpoints = points[edges[index * 4 + part]]
@@ -103,6 +103,33 @@ def test_dashed_style_does_not_offset_edges_and_glyph_stays_inside():
     assert len(np.unique(glyph, axis=0)) > 2
     empty = prediction_wireframes([], "kitti_velodyne")
     assert [v.shape for v in empty] == [(0, 3), (0, 2), (0, 3)]
+
+
+def test_prediction_wireframes_use_class_colors_without_changing_geometry():
+    detections = [prediction("Car"), prediction("Pedestrian"), prediction("Cyclist"), prediction("Other")]
+    points, edges, colors = prediction_wireframes(detections, "kitti_velodyne")
+    assert points.shape == (4 * 52 * 2, 3)
+    assert edges.shape == (4 * 52, 2)
+    assert colors.shape == (4 * 52, 3)
+    for index, detection in enumerate(detections):
+        start, end = index * 52, (index + 1) * 52
+        np.testing.assert_array_equal(
+            colors[start:end], np.tile(class_color(detection.label), (52, 1))
+        )
+        expected_points, expected_edges, _ = prediction_wireframes(
+            [detection], "kitti_velodyne"
+        )
+        np.testing.assert_allclose(points[start * 2 : end * 2], expected_points)
+        np.testing.assert_array_equal(edges[start:end] - start * 2, expected_edges)
+
+
+def test_overlay_help_explains_color_and_style_conventions():
+    assert "Car green" in HELP
+    assert "Pedestrian red" in HELP
+    assert "Cyclist blue" in HELP
+    assert "same class colors" in HELP
+    assert "dashed" in HELP
+    assert "F9" in HELP
 
 
 @pytest.mark.parametrize("case", ["generic", "camera", "axis", "wrong_type"])
