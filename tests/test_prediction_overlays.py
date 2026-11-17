@@ -124,10 +124,10 @@ def test_prediction_wireframes_use_class_colors_without_changing_geometry():
 
 
 def test_overlay_help_explains_color_and_style_conventions():
-    assert "Car green" in HELP
-    assert "Pedestrian red" in HELP
-    assert "Cyclist blue" in HELP
-    assert "same class colors" in HELP
+    assert "solid red KITTI" in HELP
+    assert "Car cyan-blue" in HELP
+    assert "Pedestrian purple" in HELP
+    assert "Cyclist amber" in HELP
     assert "dashed" in HELP
     assert "F9" in HELP
 
