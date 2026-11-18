@@ -54,6 +54,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         "inspect-experiment", help="Validate experiment JSON and inspect identity/frame selection"
     )
     experiment.add_argument("path", help="Path to a schema-v1 experiment JSON configuration")
+    run = sub.add_parser("run-experiment", help="Preflight and execute a schema-v1 experiment")
+    run.add_argument("path", help="Path to experiment JSON")
+    run.add_argument("--dry-run", action="store_true", help="Preflight only; create no artifacts")
     visualize = sub.add_parser("visualize", help="Explore a KITTI LiDAR frame in an Open3D window")
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
@@ -111,6 +114,21 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "Navigation uses frame-matched sibling labels/calib and --predictions-dir; explicit single-frame files are unsupported"
             )
     try:
+        if args.command == "run-experiment":
+            from raven.experiments.runner import run_experiment
+
+            summary = run_experiment(args.path, dry_run=args.dry_run)
+            print(json.dumps(summary.to_dict(), indent=2))
+            if summary.status not in ("ready", "success"):
+                parser.exit(
+                    1,
+                    "Experiment "
+                    + summary.status
+                    + ": "
+                    + "; ".join(failure.message for failure in summary.failures)
+                    + "\n",
+                )
+            return
         if args.command == "inspect-experiment":
             from raven.experiments.config import load_experiment_config
 

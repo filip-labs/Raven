@@ -175,13 +175,15 @@ JSON-compatible values; `from_dict()` / `load_experiment_config()` raise
 also validate and can raise standard ValueError/TypeError. Read-only inspection
 has no execution side effects.
 
-RV-031 should consume `config.frame_ids` in order, validate dataset/split and
-saved-prediction provenance, resolve/verify actual model settings and assets,
-run existing `run_preprocessing_pipeline(cloud, config.preprocessing)`, and
-persist configuration digest, bound selection, actual per-input hashes and
-runtime/source/hardware metadata. It must not infer accuracy or silently fill
-missing settings. Execution, timing, AP/mAP metrics and results export are future
-RV-031–RV-033 work, not implemented or validated by this feature.
+The [RV-031 runner](experiment-runner.md) consumes `config.frame_ids` in order and
+validates dataset/split and
+saved-prediction provenance, resolves/verifies actual model settings and assets,
+runs existing `run_preprocessing_pipeline(cloud, config.preprocessing)`, and
+persists configuration digest, bound selection, actual per-input hashes and
+runtime/source/hardware metadata. It does not infer accuracy or silently fill
+missing settings. RV-030 itself remains declaration-only; execution and minimal
+persistence are described in RV-031. Metrics, timing and broader export remain
+RV-032–RV-034 work.
 
 Tests use synthetic manifests/configurations, seeded golden selection, round trips,
 strict errors, output collisions/aliases, existing preprocessing configurations,
