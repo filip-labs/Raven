@@ -150,6 +150,13 @@ def _validate(stages):
     return tuple(validated)
 
 
+def validate_preprocessing_stages(stages: Sequence[Mapping]) -> tuple[Mapping, ...]:
+    """Validate/normalize without execution; return detached immutable stage mappings."""
+    return tuple(
+        MappingProxyType({"name": name, **parameters}) for name, parameters in _validate(stages)
+    )
+
+
 def run_preprocessing_pipeline(cloud: PointCloud, stages: Sequence[Mapping]) -> PipelineResult:
     """Prevalidate all explicit stages, run in order, and return cloud plus provenance.
 

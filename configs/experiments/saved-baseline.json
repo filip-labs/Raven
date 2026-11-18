@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "name": "Saved PointPillars baseline",
+  "experiment_id": "kitti-val-baseline-001",
+  "dataset": {
+    "root": "/path/to/kitti",
+    "split": "val"
+  },
+  "frames": {
+    "ids": [
+      "000001",
+      "000002",
+      "000004"
+    ],
+    "sample_size": 2
+  },
+  "model": {
+    "name": "pointpillars",
+    "source": "saved",
+    "predictions_dir": "/path/to/predictions"
+  },
+  "preprocessing": [],
+  "seed": 42,
+  "output": {
+    "directory": "/path/to/outputs",
+    "artifact_prefix": "baseline"
+  }
+}
