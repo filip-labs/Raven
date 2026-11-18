@@ -50,6 +50,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         "inspect-calib", help="Inspect KITTI calibration and its rigid transform"
     )
     calib.add_argument("path", help="Path to a KITTI calib/000000.txt file")
+    experiment = sub.add_parser(
+        "inspect-experiment", help="Validate experiment JSON and inspect identity/frame selection"
+    )
+    experiment.add_argument("path", help="Path to a schema-v1 experiment JSON configuration")
     visualize = sub.add_parser("visualize", help="Explore a KITTI LiDAR frame in an Open3D window")
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
@@ -107,6 +111,24 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "Navigation uses frame-matched sibling labels/calib and --predictions-dir; explicit single-frame files are unsupported"
             )
     try:
+        if args.command == "inspect-experiment":
+            from raven.experiments.config import load_experiment_config
+
+            config = load_experiment_config(args.path)
+            print(
+                json.dumps(
+                    {
+                        "configuration": config.to_dict(),
+                        "config_sha256": config.config_sha256,
+                        "selection_provenance": config.selection_provenance,
+                        "frame_ids": list(config.frame_ids),
+                        "scan_directory": str(config.dataset.scan_directory),
+                        "artifacts": {k: str(v) for k, v in config.artifact_paths.items()},
+                    },
+                    indent=2,
+                )
+            )
+            return
         if args.command == "inspect-calib":
             import numpy as np
 

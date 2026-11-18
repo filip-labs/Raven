@@ -6,6 +6,7 @@ import json
 import re
 from pathlib import Path
 
+from raven.perception.data.frame_manifest import read_frame_manifest
 from raven.perception.data.kitti_annotations import load_kitti_labels
 from raven.perception.data.kitti_calibration import load_kitti_calibration
 from raven.perception.data.kitti_loader import load_kitti_bin
@@ -14,12 +15,7 @@ SPLITS = Path(__file__).resolve().parents[1] / "configs/kitti_splits"
 
 
 def read_ids(path):
-    ids = Path(path).read_text().splitlines()
-    if not ids or any(not re.fullmatch(r"[0-9]{6}", value) for value in ids):
-        raise ValueError(f"{path}: expected nonempty six-digit frame identifiers")
-    if len(ids) != len(set(ids)):
-        raise ValueError(f"{path}: duplicate frame identifiers")
-    return ids
+    return list(read_frame_manifest(path)[0])
 
 
 def validate_splits(directory=SPLITS):

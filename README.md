@@ -330,3 +330,16 @@ license scope. Apache-2.0 code and KITTI dataset terms are reviewed separately.
 ## Author
 
 Filip Cvetković · [Portfolio](https://www.filipzcvetkovic.com)
+
+## Experiment declarations (M5 / RV-030)
+
+Validate and inspect a schema-v1 JSON declaration without running inference:
+
+```bash
+raven inspect-experiment configs/experiments/saved-baseline.json
+```
+
+See [experiment configuration](docs/experiment-configuration.md) for typed APIs,
+frame manifests/seeded selection, model sources, reused preprocessing stages,
+output validation and RV-031 integration. This command neither executes an
+experiment nor computes KITTI metrics.
