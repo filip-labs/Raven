@@ -57,6 +57,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     run = sub.add_parser("run-experiment", help="Preflight and execute a schema-v1 experiment")
     run.add_argument("path", help="Path to experiment JSON")
     run.add_argument("--dry-run", action="store_true", help="Preflight only; create no artifacts")
+    evaluation = sub.add_parser(
+        "evaluate-experiment", help="Verify and evaluate a completed KITTI run"
+    )
+    evaluation.add_argument("path", help="Path to completed run manifest")
+    evaluation.add_argument(
+        "--allow-training-smoke",
+        action="store_true",
+        help="Allow explicitly labeled training-only development metrics",
+    )
+    evaluation.add_argument("--no-bev", action="store_true", help="Compute 3D AP_R40 only")
+    evaluation.add_argument("--output", help="New JSON evidence path; never overwrite")
     visualize = sub.add_parser("visualize", help="Explore a KITTI LiDAR frame in an Open3D window")
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
@@ -114,6 +125,48 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "Navigation uses frame-matched sibling labels/calib and --predictions-dir; explicit single-frame files are unsupported"
             )
     try:
+        if args.command == "evaluate-experiment":
+            from raven.evaluation.evaluate import evaluate_experiment, save_evaluation_result
+
+            result = evaluate_experiment(
+                args.path,
+                allow_training_smoke=args.allow_training_smoke,
+                include_bev=not args.no_bev,
+            )
+            output = None
+            if result.status == "success" or args.output is not None:
+                output = (
+                    Path(args.output)
+                    if args.output
+                    else Path(args.path)
+                    .resolve()
+                    .with_name(result.experiment_identity["artifact_prefix"] + ".evaluation.json")
+                )
+                save_evaluation_result(output, result)
+            document = result.to_dict()
+            print(
+                json.dumps(
+                    {
+                        k: document[k]
+                        for k in (
+                            "status",
+                            "purpose",
+                            "evaluated_frame_count",
+                            "frame_ids",
+                            "metrics",
+                            "warnings",
+                            "failures",
+                        )
+                    }
+                    | {"output": str(output) if output else None},
+                    indent=2,
+                )
+            )
+            if result.status != "success":
+                parser.exit(
+                    3 if result.status == "blocked" else 2, "; ".join(result.failures) + "\n"
+                )
+            return
         if args.command == "run-experiment":
             from raven.experiments.runner import run_experiment
 

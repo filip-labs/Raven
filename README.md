@@ -355,3 +355,16 @@ The [experiment runner guide](docs/experiment-runner.md) explains strict split/i
 preflight, saved-prediction baselines, existing-adapter inference, run artifacts
 and failure policy. Missing GPU execution support is explicitly blocked. Execution
 records provenance and detections; it does not compute AP/mAP or benchmark latency.
+
+## KITTI detection evaluation (M5 / RV-032)
+
+```bash
+python -m pip install -e '.[evaluation]'
+raven evaluate-experiment /path/to/completed/baseline.manifest.json
+```
+
+The [evaluation guide](docs/kitti-evaluation.md) defines the pinned OpenPCDet
+AP_R40 protocol, CPU GEOS overlap backend, integrity checks, genuine image/calibration
+requirements, typed evidence and limitations. Missing metadata is blocked; training
+smoke is explicit. No official-server equivalence or full validation accuracy is
+claimed from the local frame-000000 evidence.

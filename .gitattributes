@@ -1,0 +1,2 @@
+# Preserve checksum-pinned upstream sources and license text byte-for-byte.
+src/raven/evaluation/_vendor/* whitespace=-blank-at-eol
