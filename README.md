@@ -343,3 +343,15 @@ See [experiment configuration](docs/experiment-configuration.md) for typed APIs,
 frame manifests/seeded selection, model sources, reused preprocessing stages,
 output validation and RV-031 integration. This command neither executes an
 experiment nor computes KITTI metrics.
+
+## Experiment execution (M5 / RV-031)
+
+```bash
+raven run-experiment /path/to/experiment.json --dry-run
+raven run-experiment /path/to/experiment.json
+```
+
+The [experiment runner guide](docs/experiment-runner.md) explains strict split/input
+preflight, saved-prediction baselines, existing-adapter inference, run artifacts
+and failure policy. Missing GPU execution support is explicitly blocked. Execution
+records provenance and detections; it does not compute AP/mAP or benchmark latency.

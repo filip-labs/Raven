@@ -6,7 +6,7 @@ import json
 import re
 from pathlib import Path
 
-from raven.perception.data.frame_manifest import read_frame_manifest
+from raven.perception.data.frame_manifest import read_frame_manifest, read_verified_split_manifests
 from raven.perception.data.kitti_annotations import load_kitti_labels
 from raven.perception.data.kitti_calibration import load_kitti_calibration
 from raven.perception.data.kitti_loader import load_kitti_bin
@@ -19,23 +19,8 @@ def read_ids(path):
 
 
 def validate_splits(directory=SPLITS):
-    directory = Path(directory)
-    manifest = json.loads((directory / "provenance.json").read_text())
-    groups = {}
-    for name in ("train", "val"):
-        path = directory / f"{name}.txt"
-        groups[name] = read_ids(path)
-        recorded = manifest["files"][name]
-        if (
-            len(groups[name]) != recorded["count"]
-            or hashlib.sha256(path.read_bytes()).hexdigest() != recorded["sha256"]
-        ):
-            raise ValueError(f"{path}: provenance checksum/count mismatch")
-    if set(groups["train"]) & set(groups["val"]):
-        raise ValueError("train/validation overlap")
-    if set(groups["train"]) | set(groups["val"]) != {f"{i:06d}" for i in range(7481)}:
-        raise ValueError("split union must be labeled training IDs 000000–007480")
-    return groups
+    groups, _, _ = read_verified_split_manifests(directory)
+    return {name: list(ids) for name, ids in groups.items()}
 
 
 def validate_inventory(root):
