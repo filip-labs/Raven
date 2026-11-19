@@ -6,6 +6,8 @@ pcdet/datasets/kitti/kitti_object_eval_python/ in open-mmlab/OpenPCDet revision
 MIT license; rotate_iou.py preserves its original author/RRPN attribution.
 box_utils.py comes from pcdet/utils/ at the same revision and is covered by the
 project's Apache-2.0 LICENSE.OpenPCDet. provenance.json records exact source hashes.
+Ruff excludes this directory; .gitattributes permits the upstream trailing spaces
+so reference files and licenses remain byte-for-byte unchanged.
 
 Only reviewed function ASTs from eval.py and three box_utils.py conversion functions
 are loaded. Imports/decorators are omitted, leaving AP/ignore/matching and conversion
