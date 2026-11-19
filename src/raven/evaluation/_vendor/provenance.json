@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/open-mmlab/OpenPCDet",
+  "revision": "233f849829b6ac19afb8af8837a0246890908755",
+  "sha256": {
+    "eval.py": "d9260a41f68083d685fc43fecac1c417b14a1bc53df4915a46b2924f3a6a3c64",
+    "rotate_iou.py": "d9b2820b5be5d15ee7233147643134c5d73eff129c773aef4b59ce73a8ecd7f4",
+    "box_utils.py": "9d4d769dbcc63619d1715a6f3ceb952ae4e4790b938b770a0ec29b33683fb73d"
+  }
+}

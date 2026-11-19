@@ -154,7 +154,10 @@ def _saved(path, frame_id, scan, scan_identity):
     }
 
 
-def _load_frame(config, frame_id, expected=None):
+def load_experiment_frame(
+    config: ExperimentConfig, frame_id: str, expected: FrameInputs | None = None
+):
+    """Load/hash existing experiment inputs only; never preprocess or invoke a detector."""
     if expected is not None:
         for _, identity in expected.files:
             if file_sha256(identity.path) != identity.sha256:
@@ -257,7 +260,7 @@ def preflight_experiment(config: ExperimentConfig) -> PreflightReport:
                 raise ValueError(
                     f"frame {frame_id} is not in declared {config.dataset.split} split"
                 )
-            frame, *_ = _load_frame(config, frame_id)
+            frame, *_ = load_experiment_frame(config, frame_id)
             frames.append(frame)
         except (OSError, ValueError, TypeError) as exc:
             failures.append(RunFailure("preflight", str(exc), frame_id))
@@ -342,7 +345,7 @@ def _build_detector(config, report):
 
 
 def _execute_frame(config, frame, detector):
-    observed, raw, labels, calibration, predictions, source = _load_frame(
+    observed, raw, labels, calibration, predictions, source = load_experiment_frame(
         config, frame.frame_id, frame
     )
     processed = run_preprocessing_pipeline(raw, config.preprocessing)
