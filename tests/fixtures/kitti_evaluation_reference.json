@@ -1,0 +1,57 @@
+{
+  "reference_revision": "233f849829b6ac19afb8af8837a0246890908755",
+  "kind": "independent analytic fixtures, not GPU or KITTI validation evidence",
+  "geometry": {
+    "coincident_iou": 1.0,
+    "disjoint_iou": 0.0,
+    "square_45_iou": 0.7071067811865476,
+    "half_height_3d_iou": 0.3333333333333333
+  },
+  "ap_r40": {
+    "frames": 41,
+    "perfect": 100.0,
+    "high_score_false_positive_each_frame": 50.0,
+    "wrong_class": 0.0,
+    "empty_predictions": 0.0
+  },
+  "derivation": "41 eligible GT supply all 41 reference threshold bins; R40 averages bins 1..40. Perfect precision=1, one higher-ranked unmatched FP per TP gives precision=1/2 in every bin; no TP gives zero. Coincident 2x2 squares rotated45 intersect in area 8*(sqrt(2)-1), yielding IoU 1/sqrt(2).",
+  "comparison": "reference strict IoU > threshold, not >=; GT height must exceed cutoff, DT height may equal it; 3D/BEV DontCare has no 2D suppression in this pinned implementation.",
+  "independent_reference_execution": {
+    "reference_revision": "233f849829b6ac19afb8af8837a0246890908755",
+    "reference_eval_sha256": "d9260a41f68083d685fc43fecac1c417b14a1bc53df4915a46b2924f3a6a3c64",
+    "execution": "upstream Python bodies, decorators omitted; independent analytic 3D overlaps",
+    "not_executed": [
+      "CUDA",
+      "Raven evaluator",
+      "GEOS"
+    ],
+    "frames": 41,
+    "difficulties": [
+      "easy",
+      "moderate",
+      "hard"
+    ],
+    "car_ap_r40_percent": {
+      "perfect": [
+        100.0,
+        100.0,
+        100.0
+      ],
+      "high_score_false_positive_each_frame": [
+        50.0,
+        50.0,
+        50.0
+      ],
+      "wrong_class": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "empty_predictions": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  }
+}
