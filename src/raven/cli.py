@@ -68,6 +68,47 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     evaluation.add_argument("--no-bev", action="store_true", help="Compute 3D AP_R40 only")
     evaluation.add_argument("--output", help="New JSON evidence path; never overwrite")
+    benchmark = sub.add_parser(
+        "benchmark-experiment", help="Measure bounded local preprocessing or CUDA adapter latency"
+    )
+    benchmark.add_argument("path", help="Validated schema-v1 experiment JSON")
+    benchmark.add_argument(
+        "--spec", help="Benchmark specification JSON; defaults to CPU, warmup 5, repetitions 30"
+    )
+    benchmark.add_argument(
+        "--benchmark-id",
+        help="New filename-safe output identity; never overwrite an existing benchmark",
+    )
+    export = sub.add_parser("export-results", help="Validate and export existing Raven evidence")
+    export.add_argument(
+        "sources", nargs="+", help="Explicit run/benchmark manifests or evaluation result JSON"
+    )
+    export.add_argument("--format", choices=("json", "csv", "all"), default="json")
+    export.add_argument(
+        "--output", required=True, help="New directory separate from source artifacts"
+    )
+    export.add_argument(
+        "--raw-timings", action="store_true", help="Include warmup/measured raw timing CSV"
+    )
+    verification = sub.add_parser(
+        "verify-results", help="Verify evidence integrity and explicit reproducibility checks"
+    )
+    verification.add_argument("source", help="Source evidence or export manifest")
+    verification.add_argument("--compare", help="Independent source/export to compare")
+    verification.add_argument(
+        "--check-sources",
+        action="store_true",
+        help="Require original references retained by export bundle",
+    )
+    verification.add_argument(
+        "--check-inputs", action="store_true", help="Verify original input bytes; no processing"
+    )
+    verification.add_argument(
+        "--replay-preprocessing",
+        action="store_true",
+        help="Explicit CPU-only replay against recorded processed hashes",
+    )
+    verification.add_argument("--output", help="New exclusive JSON report path; parent must exist")
     visualize = sub.add_parser("visualize", help="Explore a KITTI LiDAR frame in an Open3D window")
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
@@ -125,6 +166,57 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "Navigation uses frame-matched sibling labels/calib and --predictions-dir; explicit single-frame files are unsupported"
             )
     try:
+        if args.command == "verify-results":
+            from raven.experiments.artifacts import write_json_exclusive
+            from raven.reproducibility.verify import verify_results
+
+            result = verify_results(
+                args.source,
+                compare=args.compare,
+                check_sources=args.check_sources,
+                check_inputs=args.check_inputs,
+                replay_preprocessing=args.replay_preprocessing,
+            )
+            if args.output:
+                target = Path(args.output).absolute()
+                if target.resolve() != target or ".." in target.parts:
+                    parser.error(
+                        "verification report path cannot redirect through symlinks or traversal"
+                    )
+                write_json_exclusive(target, result.to_dict())
+            print(json.dumps(result.to_dict(), indent=2, allow_nan=False))
+            if result.status in ("failed", "unavailable"):
+                parser.exit(
+                    1 if result.status == "failed" else 3,
+                    "; ".join(result.failures) or result.status,
+                )
+            return
+        if args.command == "export-results":
+            from raven.exporting.export import ExportWriteError, export_results
+
+            try:
+                result = export_results(
+                    args.sources, args.output, format=args.format, raw_timings=args.raw_timings
+                )
+            except ExportWriteError as exc:
+                parser.exit(1, str(exc) + "\n")
+            print(json.dumps(result, indent=2, allow_nan=False))
+            return
+        if args.command == "benchmark-experiment":
+            from raven.benchmark.experiment import benchmark_experiment
+            from raven.benchmark.spec import BenchmarkSpec, load_benchmark_spec
+
+            spec = load_benchmark_spec(args.spec) if args.spec else BenchmarkSpec()
+            result = benchmark_experiment(
+                args.path, specification=spec, benchmark_id=args.benchmark_id
+            )
+            print(json.dumps(result.to_dict(), indent=2, allow_nan=False))
+            if result.status != "success":
+                parser.exit(
+                    {"blocked": 3, "invalid": 2, "failed": 1}[result.status],
+                    "; ".join(v["message"] for v in result.failures) + "\n",
+                )
+            return
         if args.command == "evaluate-experiment":
             from raven.evaluation.evaluate import evaluate_experiment, save_evaluation_result
 

@@ -19,3 +19,10 @@ contains the previously documented split lists and their notices.
 example with placeholder dataset/output paths and a one-frame spending guard.
 See [setup and authorization requirements](../docs/modal-inference.md); parsing
 this file does not authorize or execute cloud work.
+
+`benchmarks/cpu.json` and `benchmarks/local-cuda.json` are bounded schema-v1 timing
+specifications for `raven benchmark-experiment`. They reuse the selected experiment
+pipeline; no new preprocessing format is introduced. The CPU example experiment
+is `experiments/preprocessing-benchmark.json` with placeholder paths. Read the
+[measurement/loading/copy and GPU availability rules](../docs/latency-benchmarking.md)
+before comparing results.

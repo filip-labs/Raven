@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "mode": "preprocessing",
+  "warmup": 5,
+  "repetitions": 30,
+  "include_loading": false
+}

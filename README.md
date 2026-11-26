@@ -377,3 +377,28 @@ predictions and provenance compatible with KITTI evaluation. Local/saved v1 mode
 remain available. See the [Modal setup, spending controls and validation status](docs/modal-inference.md)
 and `configs/experiments/modal-pointpillars.json`. Cloud execution is opt-in; the
 candidate container has not yet been built or validated on Modal GPU hardware.
+
+## Local latency benchmarking
+
+`raven benchmark-experiment CONFIG.json` measures existing preprocessing with
+bounded warmup/repetitions, raw nanosecond observations, millisecond statistics
+and hardware/source provenance. Local CUDA adapter timing is explicitly selected
+and blocks on unsupported hardware; CPU execution imports no GPU/Modal frameworks.
+See [latency methodology and genuine one-frame CPU smoke results](docs/latency-benchmarking.md),
+`configs/benchmarks/` and `configs/experiments/preprocessing-benchmark.json`.
+
+## Versioned results export
+
+`raven export-results SOURCE --format all --raw-timings --output NEW_DIRECTORY`
+validates existing run/evaluation/benchmark evidence and writes versioned JSON,
+stable CSV tables and a final checksum manifest. It does not rerun computation
+or promote missing/synthetic values to measured results. See the
+[export schema, safety rules and pandas example](docs/results-export.md).
+
+## Experiment reproducibility
+
+`raven verify-results SOURCE` checks existing evidence and reports its precise
+scope. Add `--compare OTHER` for scientific comparisons or
+`--replay-preprocessing` for bounded CPU replay. See the
+[reproducibility contract, retention rules and real KITTI evidence](docs/experiment-reproducibility.md).
+No GPU inference is performed by verification.
