@@ -13,8 +13,17 @@ from raven.inference.contracts import (
 
 
 class RemoteDetector:
-    def __init__(self, transport, *, experiment_id, config_sha256, preprocessing_sha256):
+    def __init__(
+        self,
+        transport,
+        *,
+        experiment_id,
+        config_sha256,
+        preprocessing_sha256,
+        response_validator=validate_response,
+    ):
         self.transport = transport
+        self.response_validator = response_validator
         self.identity = {
             "experiment_id": experiment_id,
             "config_sha256": config_sha256,
@@ -43,13 +52,14 @@ class RemoteDetector:
         response, transport = self.transport.submit(deepcopy(request))
         if response.get("request_id") in self._seen:
             raise ValueError("duplicate remote response")
-        detections = validate_response(response, request)
+        detections = self.response_validator(response, request)
         if (
             not isinstance(transport, dict)
-            or transport.get("provider") != "modal"
+            or transport.get("provider") != response["worker"]["provider"]
             or transport.get("submission_attempts") != 1
-            or not isinstance(transport.get("function_call_id"), str)
-            or not transport["function_call_id"].startswith("fc-")
+            or not isinstance(transport.get("call_id"), str)
+            or not transport["call_id"]
+            or len(transport["call_id"]) > 128
         ):
             raise ValueError("remote transport invocation identity unavailable")
         self._seen.add(response["request_id"])

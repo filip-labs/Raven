@@ -103,6 +103,7 @@ class SyntheticTransport:
         return make_response(request), {
             "provider": "modal",
             "function_call_id": "fc-synthetic",
+            "call_id": "fc-synthetic",
             "submission_attempts": 1,
         }
 
@@ -652,6 +653,7 @@ def test_transport_cannot_rewrite_request_binding_before_returning(cloud):
         return make_response(request), {
             "provider": "modal",
             "function_call_id": "fc-test",
+            "call_id": "fc-test",
             "submission_attempts": 1,
         }
 
@@ -741,3 +743,26 @@ def test_deployment_policy_is_bounded_and_local_authorization_does_not_break_con
         "raven-pointpillars-weights",
         {"create_if_missing": False},
     )
+
+
+def test_neutral_detector_accepts_another_explicit_provider_profile_without_modal_api(cloud):
+    box = Detection3D((20, 0, 0), (4, 2, 1.5), 0, "Car", 0.9, "kitti_velodyne")
+
+    def submit(request):
+        return {"request_id": request["request_id"], "worker": {"provider": "another-provider"}}, {
+            "provider": "another-provider",
+            "call_id": "opaque-job-1",
+            "submission_attempts": 1,
+        }
+
+    validator = Mock(return_value=[box])
+    detector = RemoteDetector(
+        SimpleNamespace(submit=submit),
+        experiment_id="synthetic",
+        config_sha256="a" * 64,
+        preprocessing_sha256=c.digest([]),
+        response_validator=validator,
+    )
+    assert detector.detect(cloud) == [box]
+    validator.assert_called_once()
+    assert detector.provenance["transport"]["provider"] == "another-provider"

@@ -58,6 +58,7 @@ class ModalTransport:
             return response, {
                 "provider": "modal",
                 "function_call_id": call_id,
+                "call_id": call_id,
                 "round_trip_seconds": time.perf_counter() - started,
                 "sdk": SDK_VERSION,
                 "submission_attempts": 1,

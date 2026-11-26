@@ -20,7 +20,7 @@ acceptance remains open until the separate bounded smoke test succeeds.
 - `raven.inference.contracts`: strict, versioned binary request and existing
   Detection3D/prediction-document response validation, independent of the SDK.
 - `RemoteDetector`: the existing ObjectDetector shape (`initialize`, `detect`,
-  `provenance`, `close`) over an injectable `submit(request)` transport. One model
+  `provenance`, `close`) over an injectable `submit(request)` transport and response-profile validator. One model
   abstraction, no second experiment runner.
 - `ModalTransport`: optional lazy SDK import, authenticated deployed-class lookup,
   one application-level submission, bounded result wait and cancellation attempt.
@@ -325,7 +325,7 @@ metadata, not to remote inference success. Preserve original GPU logs and assets
 
 ### Recorded local checks for this change
 
-Full CPU suite: **1281 passed, 4 skipped** (71 additional CPU cases; the additional
+Full CPU suite: **1282 passed, 4 skipped** (72 additional CPU cases; the additional
 skip is the opt-in live Modal test, alongside three existing optional-data skips).
 Ruff, `pip check` and diff checks pass. The SDK definition check forbade socket
 connections and constructed both local and simulated container-import graphs;
