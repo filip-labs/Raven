@@ -79,6 +79,17 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--benchmark-id",
         help="New filename-safe output identity; never overwrite an existing benchmark",
     )
+    export = sub.add_parser("export-results", help="Validate and export existing Raven evidence")
+    export.add_argument(
+        "sources", nargs="+", help="Explicit run/benchmark manifests or evaluation result JSON"
+    )
+    export.add_argument("--format", choices=("json", "csv", "all"), default="json")
+    export.add_argument(
+        "--output", required=True, help="New directory separate from source artifacts"
+    )
+    export.add_argument(
+        "--raw-timings", action="store_true", help="Include warmup/measured raw timing CSV"
+    )
     visualize = sub.add_parser("visualize", help="Explore a KITTI LiDAR frame in an Open3D window")
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
@@ -136,6 +147,17 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "Navigation uses frame-matched sibling labels/calib and --predictions-dir; explicit single-frame files are unsupported"
             )
     try:
+        if args.command == "export-results":
+            from raven.exporting.export import ExportWriteError, export_results
+
+            try:
+                result = export_results(
+                    args.sources, args.output, format=args.format, raw_timings=args.raw_timings
+                )
+            except ExportWriteError as exc:
+                parser.exit(1, str(exc) + "\n")
+            print(json.dumps(result, indent=2, allow_nan=False))
+            return
         if args.command == "benchmark-experiment":
             from raven.benchmark.experiment import benchmark_experiment
             from raven.benchmark.spec import BenchmarkSpec, load_benchmark_spec
