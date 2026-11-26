@@ -12,5 +12,10 @@ They encode the existing [pipeline API](../docs/preprocessing-pipeline.md), with
 additional configuration wrapper. Use them with `raven visualize SCAN --compare CONFIG`.
 See [comparison usage and controls](../docs/cloud-comparison.md).
 
-Future experiment/evaluation configuration work remains separate. `kitti_splits/`
+Experiment schema and execution are documented in the configuration/runner guides. `kitti_splits/`
 contains the previously documented split lists and their notices.
+
+`experiments/modal-pointpillars.json` is the explicit schema-v2 optional Modal
+example with placeholder dataset/output paths and a one-frame spending guard.
+See [setup and authorization requirements](../docs/modal-inference.md); parsing
+this file does not authorize or execute cloud work.

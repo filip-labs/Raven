@@ -368,3 +368,12 @@ AP_R40 protocol, CPU GEOS overlap backend, integrity checks, genuine image/calib
 requirements, typed evidence and limitations. Missing metadata is blocked; training
 smoke is explicit. No official-server equivalence or full validation accuracy is
 claimed from the local frame-000000 evidence.
+
+## Optional Modal remote inference
+
+The existing experiment runner supports an explicit schema-v2 Modal source via
+a provider-neutral remote detector, with processed-input hashes, strict validated
+predictions and provenance compatible with KITTI evaluation. Local/saved v1 modes
+remain available. See the [Modal setup, spending controls and validation status](docs/modal-inference.md)
+and `configs/experiments/modal-pointpillars.json`. Cloud execution is opt-in; the
+candidate container has not yet been built or validated on Modal GPU hardware.

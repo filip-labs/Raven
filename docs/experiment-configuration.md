@@ -189,3 +189,13 @@ Tests use synthetic manifests/configurations, seeded golden selection, round tri
 strict errors, output collisions/aliases, existing preprocessing configurations,
 and fresh-process CLI imports with SciPy/Open3D/GPU frameworks blocked. Standard
 CI needs no dataset, GPU, weights or graphical desktop.
+
+## Explicit remote configuration (RV-049)
+
+Legacy saved/local-inference configurations remain schema v1. Schema v2 is reserved
+for `model.source: "modal"` with validated `model.remote` settings; incompatible
+source/version combinations are rejected. No remote credentials or local model
+paths are accepted there. Frame selection, ordered preprocessing, path safety,
+identity and serialization rules are reused. See the [Modal guide](modal-inference.md)
+and `configs/experiments/modal-pointpillars.json` for fields and opt-in execution.
+Configuration inspection remains CPU-only and nonbillable.
