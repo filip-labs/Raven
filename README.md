@@ -368,3 +368,12 @@ AP_R40 protocol, CPU GEOS overlap backend, integrity checks, genuine image/calib
 requirements, typed evidence and limitations. Missing metadata is blocked; training
 smoke is explicit. No official-server equivalence or full validation accuracy is
 claimed from the local frame-000000 evidence.
+
+## Local latency benchmarking
+
+`raven benchmark-experiment CONFIG.json` measures existing preprocessing with
+bounded warmup/repetitions, raw nanosecond observations, millisecond statistics
+and hardware/source provenance. Local CUDA adapter timing is explicitly selected
+and blocks on unsupported hardware; CPU execution imports no GPU/Modal frameworks.
+See [latency methodology and genuine one-frame CPU smoke results](docs/latency-benchmarking.md),
+`configs/benchmarks/` and `configs/experiments/preprocessing-benchmark.json`.
