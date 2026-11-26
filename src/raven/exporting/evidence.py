@@ -294,6 +294,9 @@ def _timing_series(value, expected_samples):
     require(isinstance(value["stage"], str) and value["stage"], "timing stage missing")
     require(value["clock_domain"] == "local_process", "unsupported benchmark clock domain")
     require(isinstance(value["relationship"], str), "timing relationship missing")
+    require(isinstance(value["raw_ns"], list), "raw timing samples must be a list")
+    for sample in value["raw_ns"]:
+        duration_ns(sample)
     require(
         value["raw_ns"] == expected_samples,
         "raw timing series disagrees with measured observations",
@@ -775,8 +778,8 @@ def _evaluation(path, doc, snapshot):
                 == (metric["metric"], metric["class_name"], metric["difficulty"])
             )
             require(
-                eligible == metric["eligible_ground_truth"],
-                "eligible count inconsistent with source diagnostics",
+                eligible <= metric["eligible_ground_truth"],
+                "diagnostic TP/FN exceed eligible ground truth",
             )
     unavailable = {"benchmark": "not provided"}
     if doc["status"] != "success":

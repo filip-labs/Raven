@@ -634,3 +634,28 @@ def test_standalone_blocked_benchmark_keeps_no_latency_rows(sources, tmp_path):
     assert record["status"] == "blocked" and record["payload"]["initialization"] is None
     assert rows(tmp_path / "export", "benchmark_summaries.csv")[1] == []
     assert rows(tmp_path / "export", "raw_timing_samples.csv")[1] == []
+
+
+def test_ignored_detection_diagnostics_need_not_account_for_every_eligible_gt(sources, tmp_path):
+    # Pinned KITTI matching may consume eligible GT with an ignored DT, counting neither TP nor FN.
+    value = json_source(sources["evaluation"])
+    row = next(
+        r
+        for r in value["diagnostics"]
+        if r["metric"] == "3d" and r["class_name"] == "Car" and r["difficulty"] == "easy"
+    )
+    row.update(tp=0, fn=0)
+    sources["evaluation"].write_text(json.dumps(value))
+    export_results([sources["evaluation"]], tmp_path / "export")
+    actual = json_source(tmp_path / "export/results.json")["content"]["sources"][0]["payload"]
+    assert actual["diagnostics"] == value["diagnostics"]
+
+
+def test_float_raw_nanoseconds_are_rejected_even_when_numerically_equal(sources, tmp_path):
+    def change(value):
+        series = value["frames"][0]["series"][0]
+        series["raw_ns"][0] = float(series["raw_ns"][0])
+
+    tamper_benchmark(sources["benchmark"], change)
+    with pytest.raises(ValueError, match="integer nanoseconds"):
+        export_results([sources["benchmark"]], tmp_path / "export")
