@@ -87,7 +87,7 @@ raven verify-results /path/to/run-A/baseline.manifest.json \
 ```
 
 The equivalent Python API is
-`raven.reproducibility.verify_results(path, compare=None, check_sources=False,
+`raven.reproducibility.verify.verify_results(path, compare=None, check_sources=False,
 check_inputs=False, replay_preprocessing=False)`.
 
 Default export inspection verifies self-contained file sizes/hashes, deterministic
