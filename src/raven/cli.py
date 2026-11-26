@@ -90,6 +90,25 @@ def main(argv: Sequence[str] | None = None) -> None:
     export.add_argument(
         "--raw-timings", action="store_true", help="Include warmup/measured raw timing CSV"
     )
+    verification = sub.add_parser(
+        "verify-results", help="Verify evidence integrity and explicit reproducibility checks"
+    )
+    verification.add_argument("source", help="Source evidence or export manifest")
+    verification.add_argument("--compare", help="Independent source/export to compare")
+    verification.add_argument(
+        "--check-sources",
+        action="store_true",
+        help="Require original references retained by export bundle",
+    )
+    verification.add_argument(
+        "--check-inputs", action="store_true", help="Verify original input bytes; no processing"
+    )
+    verification.add_argument(
+        "--replay-preprocessing",
+        action="store_true",
+        help="Explicit CPU-only replay against recorded processed hashes",
+    )
+    verification.add_argument("--output", help="New exclusive JSON report path; parent must exist")
     visualize = sub.add_parser("visualize", help="Explore a KITTI LiDAR frame in an Open3D window")
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
@@ -147,6 +166,31 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "Navigation uses frame-matched sibling labels/calib and --predictions-dir; explicit single-frame files are unsupported"
             )
     try:
+        if args.command == "verify-results":
+            from raven.experiments.artifacts import write_json_exclusive
+            from raven.reproducibility.verify import verify_results
+
+            result = verify_results(
+                args.source,
+                compare=args.compare,
+                check_sources=args.check_sources,
+                check_inputs=args.check_inputs,
+                replay_preprocessing=args.replay_preprocessing,
+            )
+            if args.output:
+                target = Path(args.output).absolute()
+                if target.resolve() != target or ".." in target.parts:
+                    parser.error(
+                        "verification report path cannot redirect through symlinks or traversal"
+                    )
+                write_json_exclusive(target, result.to_dict())
+            print(json.dumps(result.to_dict(), indent=2, allow_nan=False))
+            if result.status in ("failed", "unavailable"):
+                parser.exit(
+                    1 if result.status == "failed" else 3,
+                    "; ".join(result.failures) or result.status,
+                )
+            return
         if args.command == "export-results":
             from raven.exporting.export import ExportWriteError, export_results
 

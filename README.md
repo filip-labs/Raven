@@ -385,3 +385,11 @@ validates existing run/evaluation/benchmark evidence and writes versioned JSON,
 stable CSV tables and a final checksum manifest. It does not rerun computation
 or promote missing/synthetic values to measured results. See the
 [export schema, safety rules and pandas example](docs/results-export.md).
+
+## Experiment reproducibility
+
+`raven verify-results SOURCE` checks existing evidence and reports its precise
+scope. Add `--compare OTHER` for scientific comparisons or
+`--replay-preprocessing` for bounded CPU replay. See the
+[reproducibility contract, retention rules and real KITTI evidence](docs/experiment-reproducibility.md).
+No GPU inference is performed by verification.
