@@ -14,3 +14,10 @@ See [comparison usage and controls](../docs/cloud-comparison.md).
 
 Future experiment/evaluation configuration work remains separate. `kitti_splits/`
 contains the previously documented split lists and their notices.
+
+`benchmarks/cpu.json` and `benchmarks/local-cuda.json` are bounded schema-v1 timing
+specifications for `raven benchmark-experiment`. They reuse the selected experiment
+pipeline; no new preprocessing format is introduced. The CPU example experiment
+is `experiments/preprocessing-benchmark.json` with placeholder paths. Read the
+[measurement/loading/copy and GPU availability rules](../docs/latency-benchmarking.md)
+before comparing results.
