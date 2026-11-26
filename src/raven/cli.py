@@ -68,6 +68,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     evaluation.add_argument("--no-bev", action="store_true", help="Compute 3D AP_R40 only")
     evaluation.add_argument("--output", help="New JSON evidence path; never overwrite")
+    benchmark = sub.add_parser(
+        "benchmark-experiment", help="Measure bounded local preprocessing or CUDA adapter latency"
+    )
+    benchmark.add_argument("path", help="Validated schema-v1 experiment JSON")
+    benchmark.add_argument(
+        "--spec", help="Benchmark specification JSON; defaults to CPU, warmup 5, repetitions 30"
+    )
+    benchmark.add_argument(
+        "--benchmark-id",
+        help="New filename-safe output identity; never overwrite an existing benchmark",
+    )
     visualize = sub.add_parser("visualize", help="Explore a KITTI LiDAR frame in an Open3D window")
     visualize.add_argument("path", help="Path to a KITTI Velodyne .bin frame")
     visualize.add_argument(
@@ -125,6 +136,21 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "Navigation uses frame-matched sibling labels/calib and --predictions-dir; explicit single-frame files are unsupported"
             )
     try:
+        if args.command == "benchmark-experiment":
+            from raven.benchmark.experiment import benchmark_experiment
+            from raven.benchmark.spec import BenchmarkSpec, load_benchmark_spec
+
+            spec = load_benchmark_spec(args.spec) if args.spec else BenchmarkSpec()
+            result = benchmark_experiment(
+                args.path, specification=spec, benchmark_id=args.benchmark_id
+            )
+            print(json.dumps(result.to_dict(), indent=2, allow_nan=False))
+            if result.status != "success":
+                parser.exit(
+                    {"blocked": 3, "invalid": 2, "failed": 1}[result.status],
+                    "; ".join(v["message"] for v in result.failures) + "\n",
+                )
+            return
         if args.command == "evaluate-experiment":
             from raven.evaluation.evaluate import evaluate_experiment, save_evaluation_result
 

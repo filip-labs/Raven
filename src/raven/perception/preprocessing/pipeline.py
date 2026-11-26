@@ -157,13 +157,17 @@ def validate_preprocessing_stages(stages: Sequence[Mapping]) -> tuple[Mapping, .
     )
 
 
-def run_preprocessing_pipeline(cloud: PointCloud, stages: Sequence[Mapping]) -> PipelineResult:
+def run_preprocessing_pipeline(
+    cloud: PointCloud, stages: Sequence[Mapping], *, stage_observer=None
+) -> PipelineResult:
     """Prevalidate all explicit stages, run in order, and return cloud plus provenance.
 
     Canonical names: range_filter, voxel_downsample, statistical_outlier_removal,
     noise. Each mapping has a name and flat operation parameters, without defaults.
     Repetitions are valid. Empty stages produce an independent identity copy.
     Data-dependent/backend failures are wrapped with 1-based position and name.
+    Optional stage_observer(event, position, name, count) brackets operation calls;
+    observers must not mutate state. Existing result/timing semantics are unchanged.
     """
     start = perf_counter()
     validated = _validate(stages)
@@ -172,10 +176,14 @@ def run_preprocessing_pipeline(cloud: PointCloud, stages: Sequence[Mapping]) -> 
     for position, (name, parameters) in enumerate(validated, 1):
         before = current.count
         stage_start = perf_counter()
+        if stage_observer is not None:
+            stage_observer("start", position, name, before)
         try:
             current = _OPERATIONS[name](current, **parameters)
         except Exception as exc:
             raise PipelineExecutionError(f"Stage {position} ({name!r}) failed: {exc}") from exc
+        if stage_observer is not None:
+            stage_observer("finish", position, name, current.count)
         duration = perf_counter() - stage_start
         records.append(
             StageExecution(
