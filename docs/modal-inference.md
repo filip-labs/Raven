@@ -290,7 +290,8 @@ and audit evidence, not synchronized cross-host latency clocks. Recorded separat
 
 | Field | Boundary |
 | --- | --- |
-| client_preprocessing_timing | Local `run_preprocessing_pipeline` only |
+| client_preprocessing_timing | Local `run_preprocessing_pipeline` only; client process |
+| client_end_to_end_timing | Client preprocessing through validated prediction-document construction; excludes scan loading/artifact persistence |
 | serialization_seconds | Client byte/envelope construction and validation |
 | round_trip_seconds | SDK lookup + spawn + result wait/transfer |
 | total_detector_seconds | Serialization + SDK round trip + response validation |
@@ -301,9 +302,13 @@ and audit evidence, not synchronized cross-host latency clocks. Recorded separat
 Upload, download and queue delay are null with an explicit SDK visibility reason.
 Container boot/image pull is not separated from the observed round trip. Never
 subtract unsynchronized timestamps or sum overlapping lifecycle fields as per-frame
-inference time. RV-033 can add repetitions/aggregation and finer measurement
-boundaries without changing detection or evaluation semantics. RV-034 can consume
-the existing artifacts; no new general export framework is added here.
+inference time. RV-033 now provides CPU preprocessing and **local CUDA** repeated
+benchmarking. A Modal configuration can be used for CPU preprocessing measurement,
+but inference mode explicitly rejects it as remote rather than local CUDA.
+Repeated remote benchmarking is not implemented; it requires a separate feature
+and authorization. No upload/download/queue or cold-start estimates are inferred.
+RV-034 now consumes validated Modal run/evaluation artifacts through the existing
+exporter, as described below.
 
 CPU tests use synthetic responses and fake GPU boundaries, cover malformed
 requests/responses, stale duplicates, checksum/identity/geometry errors, opt-in,
@@ -323,19 +328,125 @@ separate reviewed secret option; missing credentials require supported Modal
 login/profile setup. Evaluation image/split errors belong to genuine dataset
 metadata, not to remote inference success. Preserve original GPU logs and assets.
 
-### Recorded local checks for this change
+### Completed M5 integration (2026-11-26)
 
-Full CPU suite: **1282 passed, 4 skipped** (72 additional CPU cases; the additional
-skip is the opt-in live Modal test, alongside three existing optional-data skips).
-Ruff, `pip check` and diff checks pass. The SDK definition check forbade socket
-connections and constructed both local and simulated container-import graphs;
-no App build/deploy/run/inference API was called. A built Raven wheel includes
-the exact recipe JSON and imports the CPU worker/contract modules without Modal
-or GPU dependencies.
+Latest `origin/main` at integration was `e6a833a` (merged RV-035 PR #80), including
+RV-030–RV-035. It was normally merged into the existing PR #77 history; no rebase
+or force push was used. Only `README.md` and `configs/README.md` had textual
+conflicts, resolved by retaining both the Modal and M5 sections. The configuration,
+runner, evaluator and CLI merged automatically and were then checked semantically.
+Existing v1 configurations and explicit Modal schema-v2 declarations are retained;
+run/evaluation/benchmark/export schema versions and metric algorithms are unchanged.
 
-The actual local training frame 000000 was read-only checked: **115,384 points**
-and the expected SHA256 above. `run_experiment(..., dry_run=True)` returned
-`blocked` on the missing explicit GPU opt-in, created no run directory and made
-zero cloud calls; the source scan remained unchanged. Ignored local records are
-under `outputs/rv049`. This is local input/preflight evidence, not remote inference,
-visual rendering, accuracy, latency measurement or budget authorization.
+#### Export and evidence identity
+
+RV-034 validates schema-v2 Modal runs with the same strict request/response validator
+used at evaluation, checks the processed input/frame/config/preprocessing binding,
+and checks returned detections against persisted Detection3D objects. It does not
+require a local checkpoint path: model/config/base-config/checkpoint identities are
+in the remote request and observed response. Remote model/worker/transport/timing
+provenance is preserved in exported JSON and `model_json` CSV. No new export format
+or remote benchmark table is introduced. Remote timings remain explicitly named
+seconds within provenance; local benchmark CSV retains its existing millisecond
+summary/nanosecond raw-sample conventions.
+
+Real-looking response fields alone are not proof of execution. `SyntheticTransport`
+fixtures explicitly mark transport evidence `synthetic_test=True`; the detector
+retains that flag and source consistency checks require matching labels. Such runs
+export as `synthetic_test` and the evaluator blocks metric publication. Missing AP
+is unavailable (no fabricated metric rows or zero AP). A non-synthetic remote run
+exports as `declared_remote_modal_inference`, never authenticated GPU evidence.
+There is no independent provider execution attestation. Mocked model package/GPU
+fields are contract fixtures and must not be cited as observed hardware.
+
+#### Reproducibility and offline inspection
+
+RV-035 verification accepts valid remote sources and preserves request/response,
+model, processed-input and invocation identities. Offline export inspection also
+revalidates embedded remote contracts, configuration digest, frame ordering,
+predictions and evidence labels without reading the original paths. Original
+source-reference checks remain opt-in and strict; a self-consistent archive is
+not an authenticity guarantee. Runtime source/recipe compatibility is still
+required by the pinned remote profile, so retain the matching Raven source too.
+
+```bash
+# CPU-only synthetic integration; no cloud flags/credentials needed:
+python -m pytest -q tests/test_modal_m5_integration.py tests/test_remote_inference.py
+
+# Inspect an existing completed remote run and its export without new inference:
+raven export-results /path/to/run/modal.manifest.json --format all --output NEW_EXPORT
+raven verify-results NEW_EXPORT/manifest.json
+raven verify-results NEW_EXPORT/manifest.json --check-sources --check-inputs
+raven verify-results /path/to/run/modal.manifest.json --replay-preprocessing
+raven verify-results /path/to/run-A/modal.manifest.json \
+  --compare /path/to/run-B/modal.manifest.json
+```
+
+CPU replay loads the original scan, runs the declared local stages and checks the
+exact processed XYZI hash/count/frame metadata. It does not initialize Modal or
+reproduce the response predictions. Actual inference is `not_performed` and
+cross-environment reproducibility is `not_established`. Comparison explicitly
+partitions request nonce/time/config-envelope hash, response-envelope hash, worker
+instance, transport handles and measured client/worker durations. Original values
+remain in artifacts/reports. Input/model hashes, response predictions, clock
+contracts, synthetic label and unknown scientific fields remain comparable. This
+extends the existing [RV-035 policy](experiment-reproducibility.md); no blanket
+ignore of remote provenance is used.
+
+#### Recorded local checks
+
+Full merged CPU suite: **1489 passed, 5 skipped**, including 20 new M5 compatibility
+cases beyond the 72 original Modal CPU cases. Five skips are the existing four
+optional checks plus the opt-in live Modal test. Ruff, `pip check` and full diff
+checks pass. A third-party Dash pytest deprecation warning is unrelated to Raven.
+Tests cover legacy v1 through the existing suites and explicit v2, processed input
+binding, invalid replies/provenance, timeout/transport failure, no fallback,
+synthetic evaluation blocking, JSON/CSV export, offline inspection, separate
+invocation comparisons, CPU replay, local-CUDA rejection and CPU command imports
+with Modal/PyTorch/OpenPCDet/spconv/cumm/Open3D imports forbidden. Standard CI
+requires no cloud credentials, downloads or GPU.
+
+Prior PR #77 checks constructed the pinned SDK app/image definition locally with
+socket connections forbidden and built a wheel containing the recipe. Those were
+local definition/packaging checks, not an image build or GPU test. This integration
+also initiates no SDK lookup, build, deployment, upload or cloud inference.
+
+Read-only genuine KITTI smoke executed at clean source
+`1696c33` (full identity retained in the local report): Python 3.11.12, NumPy 2.4.6,
+macOS 26.6.2 arm64. Frame `000000` has 115,384 points and SHA256
+`0e09c85e3f6078ecbdd1e706ee9624519f1bd29417437167a9ed7fbe6f54b4b1`.
+Each row used a fresh run directory and one synthetic remote request, plus a
+one-repetition genuine **CPU preprocessing** benchmark:
+
+| Local preprocessing | Processed points | Processed XYZI SHA256 |
+| --- | ---: | --- |
+| Identity | 115,384 | `0e09c85e3f6078ecbdd1e706ee9624519f1bd29417437167a9ed7fbe6f54b4b1` |
+| Inclusive range | 62,853 | `24ee9bd452bb3103d7016359253ac8f953e18c4926c953a0e4e35dd1b5f2f86f` |
+| Full ordered pipeline | 12,232 | `a1f5be2fb87d17521feae88c1dafcd68367ecca326630656fd60d46e65f264e0` |
+
+Range and full stages are exactly `configs/preprocessing/range.json` and
+`configs/preprocessing/full.json`; their parameters and hashes match the RV-035
+local evidence. Submitted binary payloads matched these processed hashes exactly.
+Responses contained one **synthetic** Car fixture per case, not newly generated
+PointPillars predictions or reuse of the historical 29-detection capture. Each
+run persisted successfully, export/offline checks passed, and CPU replay passed
+without a transport call. Evaluation input checks remained blocked because genuine
+`image_2/000000.png` is unavailable; no real AP is claimed. Synthetic dataset tests
+separately confirm that explicit mocked-execution flags block evaluation even when
+images are present. Cloud-disabled dry-run blocked before creating run outputs.
+Original scan/calibration/labels were hashed before/after and unchanged; no
+checkpoint bytes were read, deserialized or uploaded. Sandbox `sysctl` queries
+printed permission diagnostics but did not prevent successful CPU/artifact checks.
+Reports and the smoke script remain ignored under `outputs/rv049-m5/`.
+
+#### Remaining live-validation requirements
+
+Local integration is ready for review. It is not clearance to deploy. A separately
+authorized live smoke still requires dataset/checkpoint cloud-use rights, verified
+workspace/profile access and budget, private permitted asset storage, candidate
+image build/boot on T4, safe-loading validation, actual returned output/provenance
+and usage/billing evidence. Do not assume clearance from a hash or public model
+link. No checkpoint or dataset is distributed with Raven. Genuine GPU behavior,
+remote cold start, output counts, accuracy, remote latency distributions and
+cross-environment numerical equivalence remain unverified. No cloud operations
+were performed in this integration.
