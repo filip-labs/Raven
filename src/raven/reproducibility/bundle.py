@@ -94,7 +94,11 @@ def load_bundle(path, snapshot):
             source["source_id"] == source["source_type"] + "-" + sha(primary["sha256"]),
             "embedded source identity mismatch",
         )
-        records.append(Evidence(**source))
+        record = Evidence(**source)
+        from raven.inference.evidence import validate_archived_remote_run
+
+        validate_archived_remote_run(record)
+        records.append(record)
     require(len({r.source_id for r in records}) == len(records), "duplicate embedded evidence")
     require(
         manifest.get("sources")

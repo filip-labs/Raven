@@ -48,6 +48,35 @@ def _inputs(value):
     return scientific, locations
 
 
+def _remote(metadata):
+    """Partition only invocation identities/timings, after strict remote validation."""
+    variable = {}
+    request = metadata["request"]
+    variable["request"] = _take(
+        request, ["request_id", "submitted_at_utc", "experiment_config_sha256", "request_sha256"]
+    )
+    response = metadata["response"]
+    variable["response"] = _take(response, ["request_id", "request_sha256", "response_sha256"])
+    variable["worker_instance"] = _take(response["worker"], ["worker_id"])
+    variable["worker_timings"] = _take(
+        response["timings"],
+        [
+            "worker_started_at_utc",
+            "worker_finished_at_utc",
+            "model_load_seconds",
+            "detect_seconds",
+            "worker_total_seconds",
+        ],
+    )
+    variable["transport"] = _take(
+        metadata["transport"], ["function_call_id", "call_id", "round_trip_seconds"]
+    )
+    variable["client_timings"] = _take(
+        metadata["client_timings"], ["serialization_seconds", "total_detector_seconds"]
+    )
+    return variable
+
+
 def projection(record):
     """Return scientific fields, explicitly variable fields and AP-only numeric vector."""
     config = deepcopy(record.configuration)
@@ -92,6 +121,11 @@ def projection(record):
             row["preprocessing"], timings = _pipeline(row["preprocessing"])
             extra = {"input_paths": paths, "preprocessing": timings}
             source = row.get("prediction_source", {})
+            if source.get("mode") == "remote_adapter":
+                extra["remote_invocation"] = _remote(source["model_provenance"])
+                for key in ("client_preprocessing_timing", "client_end_to_end_timing"):
+                    if key in row:
+                        extra[key] = _take(row[key], ["seconds"])
             if source.get("mode") == "live_adapter" and isinstance(
                 source.get("model_provenance"), dict
             ):

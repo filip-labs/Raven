@@ -57,6 +57,7 @@ class RemoteDetector:
             not isinstance(transport, dict)
             or transport.get("provider") != response["worker"]["provider"]
             or transport.get("submission_attempts") != 1
+            or type(transport.get("synthetic_test", False)) is not bool
             or not isinstance(transport.get("call_id"), str)
             or not transport["call_id"]
             or len(transport["call_id"]) > 128
@@ -65,6 +66,13 @@ class RemoteDetector:
         self._seen.add(response["request_id"])
         self._provenance = {
             "backend": "remote",
+            "synthetic_test": transport.get("synthetic_test", False),
+            "timing_domains": {
+                "client_timings": "client_process",
+                "transport.round_trip_seconds": "client_process",
+                "response.timings": "worker_process",
+                "rule": "Independent monotonic clocks; never subtract cross-host timestamps or sum nested scopes",
+            },
             "request": request_metadata(request),
             "response": response,
             "transport": transport,

@@ -396,7 +396,14 @@ def _execute_frame(config, frame, detector):
                     "seconds": preprocessing_seconds,
                     "clock": "time.perf_counter",
                     "scope": "run_preprocessing_pipeline",
-                }
+                    "clock_domain": "client_process",
+                },
+                "client_end_to_end_timing": {
+                    "seconds": time.perf_counter() - preprocessing_started,
+                    "clock": "time.perf_counter",
+                    "clock_domain": "client_process",
+                    "scope": "local preprocessing through validated remote detections; excludes input loading and artifact persistence",
+                },
             }
             if config.model.source == "modal"
             else {}

@@ -102,6 +102,8 @@ class SyntheticTransport:
         self.requests.append(request)
         return make_response(request), {
             "provider": "modal",
+            "synthetic_test": True,
+            "round_trip_seconds": 0.01,
             "function_call_id": "fc-synthetic",
             "call_id": "fc-synthetic",
             "submission_attempts": 1,
@@ -440,8 +442,10 @@ def test_runner_sends_exact_processed_points_and_evaluator_accepts_contract(conf
     assert frame["client_preprocessing_timing"]["seconds"] >= 0
     assert "points" not in frame["prediction_source"]["model_provenance"]["request"]
     evaluated = evaluate_experiment(manifest)
-    assert evaluated.status == "success", evaluated.failures
-    assert evaluated.evaluated_frame_count == 1
+    assert evaluated.status == "blocked", evaluated.failures
+    assert evaluated.evaluated_frame_count == 0
+    assert not evaluated.metrics
+    assert any("mocked inference" in failure for failure in evaluated.failures)
     for path, raw in before.items():
         assert path.read_bytes() == raw
     # Evidence is synthetic test data, never a claimed real GPU run.

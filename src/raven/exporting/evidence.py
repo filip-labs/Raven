@@ -257,6 +257,26 @@ def _run(path, doc, snapshot):
                 "saved source mislabeled as inference",
             )
             kinds.add("saved_predictions")
+        elif config.model.source == "modal":
+            from raven.inference.evidence import validate_remote_evidence
+
+            require(
+                source.get("mode") == "remote_adapter", "remote inference source binding missing"
+            )
+            require(
+                source.get("input_binding") == "executed_on_recorded_processed_cloud",
+                "remote processed-input binding missing",
+            )
+            metadata = source.get("model_provenance")
+            require(
+                validate_remote_evidence(metadata, row, config) == detections,
+                "remote response differs from persisted detections",
+            )
+            kinds.add(
+                "synthetic_test"
+                if metadata.get("synthetic_test")
+                else "declared_remote_modal_inference"
+            )
         else:
             require(source.get("mode") == "live_adapter", "local inference source binding missing")
             metadata = source.get("model_provenance")
