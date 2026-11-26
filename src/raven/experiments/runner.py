@@ -8,6 +8,7 @@ import os
 import platform
 import re
 import subprocess
+import time
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -275,6 +276,10 @@ def preflight_experiment(config: ExperimentConfig) -> PreflightReport:
             raise RuntimeError("statistical preprocessing requires optional SciPy")
         if config.model.source == "inference":
             model.update(_inference_preflight(config))
+        elif config.model.source == "modal":
+            from raven.inference.modal_transport import modal_preflight
+
+            model.update(modal_preflight())
     except RuntimeError as exc:
         return PreflightReport(
             "blocked",
@@ -334,6 +339,17 @@ def _environment():
 
 
 def _build_detector(config, report):
+    if config.model.source == "modal":
+        from raven.inference.contracts import digest
+        from raven.inference.detector import RemoteDetector
+        from raven.inference.modal_transport import ModalTransport
+
+        return RemoteDetector(
+            ModalTransport(config.model.remote),
+            experiment_id=config.experiment_id,
+            config_sha256=config.config_sha256,
+            preprocessing_sha256=digest(config.to_dict()["preprocessing"]),
+        )
     from raven.perception.detection.pointpillars import PointPillarsDetector
 
     return PointPillarsDetector(
@@ -348,7 +364,9 @@ def _execute_frame(config, frame, detector):
     observed, raw, labels, calibration, predictions, source = load_experiment_frame(
         config, frame.frame_id, frame
     )
+    preprocessing_started = time.perf_counter()
     processed = run_preprocessing_pipeline(raw, config.preprocessing)
+    preprocessing_seconds = time.perf_counter() - preprocessing_started
     processed_hash = hashlib.sha256(processed.cloud.points.astype("<f4").tobytes()).hexdigest()
     if detector is not None:
         predictions = detector.detect(processed.cloud)
@@ -358,7 +376,7 @@ def _execute_frame(config, frame, detector):
         ):
             raise ValueError("detector mutated the recorded input cloud")
         source = {
-            "mode": "live_adapter",
+            "mode": "remote_adapter" if config.model.source == "modal" else "live_adapter",
             "input_binding": "executed_on_recorded_processed_cloud",
             "model_provenance": detector.provenance,
         }
@@ -372,6 +390,17 @@ def _execute_frame(config, frame, detector):
         "processed_xyzi_sha256": processed_hash,
         "processed_hash_representation": "contiguous-little-endian-float32-XYZI",
         "preprocessing": processed.to_metadata_dict(),
+        **(
+            {
+                "client_preprocessing_timing": {
+                    "seconds": preprocessing_seconds,
+                    "clock": "time.perf_counter",
+                    "scope": "run_preprocessing_pipeline",
+                }
+            }
+            if config.model.source == "modal"
+            else {}
+        ),
         "predictions": document,
         "prediction_source": source,
         "prediction_count": len(predictions),
@@ -402,9 +431,11 @@ def run_experiment(
         )
     environment = _environment()
     detector = None
-    if config.model.source == "inference":
+    if config.model.source in ("inference", "modal"):
         try:
-            if file_sha256(config.model.config) != report.model_evidence.get("config_sha256"):
+            if config.model.source == "inference" and file_sha256(
+                config.model.config
+            ) != report.model_evidence.get("config_sha256"):
                 raise ValueError("model config changed since preflight")
             detector = _build_detector(config, report)
             detector.initialize()
@@ -434,7 +465,7 @@ def run_experiment(
                 "started_at_utc": start,
             },
         )
-        for frame in report.frames:
+        for index, frame in enumerate(report.frames):
             try:
                 frames.append(_execute_frame(config, frame, detector))
             except Exception as exc:  # noqa: BLE001 -- Serialize external execution failures, never fallback.
@@ -448,6 +479,24 @@ def run_experiment(
                         "inputs": {k: v.to_dict() for k, v in frame.files},
                     }
                 )
+                if config.model.source == "modal":
+                    # An uncertain remote outcome must not trigger further chargeable frames.
+                    for remaining in report.frames[index + 1 :]:
+                        skipped = RunFailure(
+                            "remote_aborted",
+                            "not submitted after remote failure",
+                            remaining.frame_id,
+                        )
+                        failures.append(skipped)
+                        frames.append(
+                            {
+                                "frame_id": remaining.frame_id,
+                                "status": "failed",
+                                "failure": asdict(skipped),
+                                "inputs": {k: v.to_dict() for k, v in remaining.files},
+                            }
+                        )
+                    break
     except (OSError, ValueError, TypeError) as exc:
         failures.append(RunFailure("output_creation", str(exc)))
     finally:

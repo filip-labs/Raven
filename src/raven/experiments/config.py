@@ -1,4 +1,4 @@
-"""Schema-v1 experiment declarations and deterministic frame selection, without execution."""
+"""Versioned experiment declarations and deterministic frame selection, without execution."""
 
 import hashlib
 import json
@@ -130,19 +130,58 @@ class FrameSelection:
 
 
 @dataclass(frozen=True)
+class ModalConfig:
+    app: str
+    environment: str
+    worker_class: str = "PointPillarsWorker"
+    timeout_seconds: int = 300
+    max_frames: int = 1
+
+    def __post_init__(self):
+        for name in ("app", "environment"):
+            _slug(getattr(self, name), f"remote.{name}")
+        if self.worker_class != "PointPillarsWorker":
+            raise ValueError("remote.worker_class must be PointPillarsWorker")
+        if type(self.timeout_seconds) is not int or not 1 <= self.timeout_seconds <= 600:
+            raise ValueError("remote.timeout_seconds must be an integer in [1,600]")
+        if type(self.max_frames) is not int or not 1 <= self.max_frames <= 8:
+            raise ValueError("remote.max_frames must be an integer in [1,8]")
+
+    def to_dict(self):
+        return {
+            k: getattr(self, k)
+            for k in ("app", "environment", "worker_class", "timeout_seconds", "max_frames")
+        }
+
+
+@dataclass(frozen=True)
 class ModelConfig:
     name: Literal["pointpillars"]
-    source: Literal["saved", "inference"]
+    source: Literal["saved", "inference", "modal"]
     predictions_dir: Path | None = None
     config: Path | None = None
     checkpoint: Path | None = None
     checkpoint_sha256: str | None = None
     openpcdet_revision: str | None = None
 
+    remote: ModalConfig | None = None
+
     def __post_init__(self):
-        if self.name != "pointpillars" or self.source not in ("saved", "inference"):
-            raise ValueError("model requires name pointpillars and source saved or inference")
+        if self.name != "pointpillars" or self.source not in ("saved", "inference", "modal"):
+            raise ValueError(
+                "model requires name pointpillars and source saved, inference or modal"
+            )
         inference = (self.config, self.checkpoint, self.checkpoint_sha256, self.openpcdet_revision)
+        if self.source == "modal":
+            if (
+                not isinstance(self.remote, ModalConfig)
+                or self.predictions_dir is not None
+                or any(v is not None for v in inference)
+            ):
+                raise ValueError("modal model requires only validated remote settings")
+            return
+        if self.remote is not None:
+            raise ValueError("remote settings require modal source")
         if self.source == "saved":
             if self.predictions_dir is None or any(v is not None for v in inference):
                 raise ValueError(
@@ -168,6 +207,8 @@ class ModelConfig:
                     raise ValueError("model config/checkpoint must name files")
 
     def to_dict(self) -> dict:
+        if self.source == "modal":
+            return {"name": self.name, "source": self.source, "remote": self.remote.to_dict()}
         fields = (
             ("predictions_dir",)
             if self.source == "saved"
@@ -207,8 +248,8 @@ class ExperimentConfig:
     schema_version: int = 1
 
     def __post_init__(self):
-        if type(self.schema_version) is not int or self.schema_version != 1:
-            raise ValueError("unsupported experiment schema_version; expected 1")
+        if type(self.schema_version) is not int or self.schema_version not in (1, 2):
+            raise ValueError("unsupported experiment schema_version; expected 1 or 2")
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("name must be nonempty text")
         self.name.encode("utf-8")
@@ -222,6 +263,12 @@ class ExperimentConfig:
         ):
             if not isinstance(value, cls):
                 raise TypeError(f"expected validated {cls.__name__}")
+        if (self.schema_version == 2) != (self.model.source == "modal"):
+            raise ValueError(
+                "unsupported schema_version/source combination: schema 2 requires modal; legacy sources use 1"
+            )
+        if self.model.source == "modal" and len(self.frame_ids) > self.model.remote.max_frames:
+            raise ValueError("frame selection exceeds remote.max_frames spending guard")
         stages = validate_preprocessing_stages(self.preprocessing)
         object.__setattr__(self, "preprocessing", stages)
         if self.model.source == "saved" and stages:
@@ -341,6 +388,7 @@ class ExperimentConfig:
                     "checkpoint",
                     "checkpoint_sha256",
                     "openpcdet_revision",
+                    "remote",
                 ),
                 "model",
             )
@@ -355,7 +403,13 @@ class ExperimentConfig:
             )
             model = ModelConfig(
                 **{
-                    k: _path(v, base) if k in ("predictions_dir", "config", "checkpoint") else v
+                    k: (
+                        _path(v, base)
+                        if k in ("predictions_dir", "config", "checkpoint")
+                        else _modal_config(v)
+                        if k == "remote"
+                        else v
+                    )
                     for k, v in m.items()
                 }
             )
@@ -372,6 +426,13 @@ class ExperimentConfig:
             )
         except (OSError, ValueError, TypeError, OverflowError) as exc:
             raise ExperimentConfigurationError(str(exc)) from exc
+
+
+def _modal_config(value):
+    _keys(
+        value, ("app", "environment"), ("worker_class", "timeout_seconds", "max_frames"), "remote"
+    )
+    return ModalConfig(**value)
 
 
 def _object(pairs):

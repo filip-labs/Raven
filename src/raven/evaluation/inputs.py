@@ -253,13 +253,22 @@ def prepare_sources(run: CompletedRun, *, allow_training_smoke: bool):
             )
         else:
             if (
-                supplied_source.get("mode") != "live_adapter"
+                supplied_source.get("mode")
+                != ("remote_adapter" if config.model.source == "modal" else "live_adapter")
                 or supplied_source.get("input_binding") != "executed_on_recorded_processed_cloud"
             ):
                 raise EvaluationInvalid("live-source execution binding is incompatible")
             model = supplied_source.get("model_provenance")
             if not isinstance(model, dict) or not model:
                 raise EvaluationBlocked("live model provenance unavailable")
+            if config.model.source == "modal":
+                from raven.inference.evidence import validate_remote_evidence
+
+                if validate_remote_evidence(model, record, config) != detections:
+                    raise EvaluationInvalid("remote response differs from persisted detections")
+                warnings.append(
+                    "remote worker evidence is consistency-checked, not independently attested GPU execution"
+                )
             if model.get("synthetic_test") or model.get("not_real_gpu_inference"):
                 raise EvaluationBlocked(
                     "source declares mocked inference, not genuine GPU evidence"
