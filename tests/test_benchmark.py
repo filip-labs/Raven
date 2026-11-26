@@ -729,3 +729,16 @@ def test_optional_real_kitti_cpu_smoke(tmp_path):
         frame.source["sha256"] == "0e09c85e3f6078ecbdd1e706ee9624519f1bd29417437167a9ed7fbe6f54b4b1"
     )
     assert all(s.summary["count"] == 2 for s in frame.series)
+
+
+def test_model_revision_probe_failure_has_typed_invalid_outcome(config):
+    def factory(config):
+        raise subprocess.CalledProcessError(1, ["git", "rev-parse", "HEAD"])
+
+    result = benchmark_experiment(
+        config,
+        specification=BenchmarkSpec(mode="inference", warmup=0, repetitions=1),
+        _backend_factory=factory,
+    )
+    assert result.status == "invalid" and result.failures[0]["phase"] == "model_configuration"
+    assert result.initialization is None and not result.frames and result.output_directory is None

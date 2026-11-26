@@ -223,7 +223,8 @@ attestation. A wheel may lack a Git revision; source hashes remain available.
 Observed on **2026-11-26**, Apple M1 Pro / arm64, OS-reported
 macOS-26.6.2-arm64-arm-64bit, Python 3.11.12, NumPy 2.4.6, SciPy 1.17.1.
 Source revision: **84d321fb6f95c1c2524d503e348c43ebb4035d74**, clean worktree for
-all six variants. This guide was added afterward without changing measured code.
+all six variants. Later changes add documentation and failure-path handling;
+the measured timing boundaries and preprocessing algorithms are unchanged.
 Input: training frame **000000**, **115,384 points**, SHA256
 `0e09c85e3f6078ecbdd1e706ee9624519f1bd29417437167a9ed7fbe6f54b4b1`.
 Defaults: **5 warmups + 30 measured repetitions**, preload mode, fixed order shown
@@ -283,7 +284,7 @@ implements none of Modal, deployment, asset upload or remote measurement; it doe
 not copy unfinished PR #77 code or require it to merge.
 
 Standard CI uses synthetic fixtures, no datasets/weights/GPU/service credentials.
-Local quality checks: **1273 passed, 4 skipped** (63 additional CPU cases and one
+Local quality checks: **1274 passed, 4 skipped** (64 additional CPU cases and one
 optional KITTI skip), Ruff, dependency and diff checks pass. Existing runner,
 evaluator and pipeline regressions remain intact. Optional actual data test:
 

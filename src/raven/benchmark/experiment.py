@@ -5,6 +5,7 @@ This measures operations; it does not execute/persist a second detection experim
 
 import hashlib
 import json
+import subprocess
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -313,7 +314,7 @@ def benchmark_experiment(
             status = "blocked"
             failures.append({"phase": "cuda_availability", "message": str(exc)})
             unavailable["inference_adapter"] = str(exc)
-        except (ValueError, TypeError) as exc:
+        except (ValueError, TypeError, subprocess.SubprocessError) as exc:
             status = "invalid"
             failures.append({"phase": "model_configuration", "message": str(exc)})
     reserved = False
