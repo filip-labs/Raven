@@ -377,3 +377,11 @@ and hardware/source provenance. Local CUDA adapter timing is explicitly selected
 and blocks on unsupported hardware; CPU execution imports no GPU/Modal frameworks.
 See [latency methodology and genuine one-frame CPU smoke results](docs/latency-benchmarking.md),
 `configs/benchmarks/` and `configs/experiments/preprocessing-benchmark.json`.
+
+## Versioned results export
+
+`raven export-results SOURCE --format all --raw-timings --output NEW_DIRECTORY`
+validates existing run/evaluation/benchmark evidence and writes versioned JSON,
+stable CSV tables and a final checksum manifest. It does not rerun computation
+or promote missing/synthetic values to measured results. See the
+[export schema, safety rules and pandas example](docs/results-export.md).
