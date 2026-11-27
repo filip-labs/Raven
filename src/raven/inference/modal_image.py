@@ -23,10 +23,19 @@ def recipe_sha256():
 def build_image():
     import modal
 
-    # No weights/data in image layers. Only the explicitly named Raven source package is included.
+    spec = image_spec()
+    build = [f"{name}=={version}" for name, version in spec["build_packages"].items()]
+    packages = spec["packages"]
+    cuda = [f"{name}=={packages[name]}" for name in ("torch", "torchvision")]
+    other = [
+        f"{name}=={version}"
+        for name, version in packages.items()
+        if name not in {"torch", "torchvision", "pcdet"}
+    ]
+    # No assets/weights; constructing this graph does not build it or change the workspace builder.
     return (
-        modal.Image.from_registry(image_spec()["base"], add_python="3.10")
-        .apt_install("git", "build-essential", "ninja-build")
+        modal.Image.from_registry(spec["base"], add_python=spec["python"])
+        .apt_install("git", "build-essential", "ninja-build", "clang")
         .env(
             {
                 "CUMM_DISABLE_JIT": "1",
@@ -34,33 +43,22 @@ def build_image():
                 "TORCH_CUDA_ARCH_LIST": "7.5",
                 "CUDA_HOME": "/usr/local/cuda",
                 "RAVEN_MODAL_GPU": "T4",
+                "PYTHONPATH": "/root",
             }
         )
-        .pip_install("pip==24.3.1", "setuptools==69.5.1", "wheel==0.43.0", "numpy==1.26.4")
-        .pip_install("torch==2.2.2+cu118", index_url="https://download.pytorch.org/whl/cu118")
-        .pip_install(
-            "spconv-cu118==2.3.6",
-            "cumm-cu118==0.4.11",
-            "numba==0.59.1",
-            "scipy==1.12.0",
-            "easydict==1.13",
-            "PyYAML==6.0.2",
-            "scikit-image==0.22.0",
-            "tensorboardX==2.6.2.2",
-            "tqdm==4.67.1",
-            "SharedArray==3.2.4",
-            "pandas==2.2.3",
-            "opencv-python-headless==4.10.0.84",
-            "pyquaternion==0.9.9",
-            "pybind11==2.13.6",
-            "ninja==1.11.1.3",
-        )
+        .pip_install(*build, f"numpy=={packages['numpy']}")
+        .pip_install(*cuda, index_url="https://download.pytorch.org/whl/cu118")
+        .pip_install(*other)
         .run_commands(
             "git clone https://github.com/open-mmlab/OpenPCDet.git /opt/OpenPCDet",
             f"git -C /opt/OpenPCDet checkout --detach {REVISION}",
             "cd /opt/OpenPCDet && python -m pip install --no-build-isolation --no-deps -e .",
         )
         .add_local_python_source("raven", copy=True, ignore=[])
-        # Explicit, hash-guarded optional Argoverse-only patch; backup/diff are preserved.
-        .run_commands("python -m raven.inference.patch_argo")
+        # Explicit upstream patch; CPU import/native/config checks fail BEFORE GPU startup.
+        .run_commands(
+            "PYTHONPATH=/root python -m raven.inference.patch_argo",
+            "python -m pip check",
+            "PYTHONPATH=/root python -m raven.inference.image_validation --root /opt/OpenPCDet --output /opt/raven-image-validation.json",
+        )
     )

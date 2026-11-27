@@ -5,6 +5,7 @@ import json
 import math
 import re
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 
@@ -17,13 +18,12 @@ REVISION = "233f849829b6ac19afb8af8837a0246890908755"
 CHECKPOINT = "4c83fc0fa02575b9b3e9dec676f698e7a70bb5a795e89f91df8a96b916fa19e2"
 MODEL_CONFIG = "170a9ffe76cfd8509d1044cfbcf1cbd44c5d320fda81bf0089a8d5efaf1c91c8"
 BASE_CONFIG = "a6c44a7b0f15b94e135946cecbd8b5541906a69d37811705e9884a411e7b1797"
-PACKAGES = {
-    "torch": "2.2.2+cu118",
-    "spconv-cu118": "2.3.6",
-    "cumm-cu118": "0.4.11",
-    "numpy": "1.26.4",
-    "pcdet": "0.6.0+233f849",
-}
+# One reviewed runtime inventory shared with image installation/build/startup checks.
+PACKAGES = json.loads(Path(__file__).with_name("image-spec.json").read_text())["packages"]
+
+
+def supported_python(value):
+    return isinstance(value, str) and re.fullmatch(r"3\.10\.[0-9]+", value) is not None
 
 
 def model_identity():
@@ -289,7 +289,7 @@ def validate_response_metadata(response, request):
         raise ValueError("worker recipe/Raven source mismatch")
     if (
         worker["packages"] != PACKAGES
-        or not (isinstance(worker["python"], str) and worker["python"].startswith("3.10."))
+        or not supported_python(worker["python"])
         or worker["cuda_runtime"] != "11.8"
     ):
         raise ValueError("worker dependency mismatch")

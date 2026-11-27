@@ -411,7 +411,7 @@ def test_modal_transport_never_resubmits_and_sanitizes_failures(monkeypatch, clo
     assert "fc-synthetic" in str(failure.value)
     spawn.assert_called_once()
     call.get.assert_called_once_with(timeout=7)
-    call.cancel.assert_called_once_with()
+    call.cancel.assert_called_once_with(terminate_containers=True)
     lookup.assert_called_once_with(
         "raven-pointpillars", "PointPillarsWorker", environment_name="main"
     )
@@ -587,7 +587,7 @@ def test_worker_startup_rejects_wrong_gpu_before_loading_checkpoint(monkeypatch)
     monkeypatch.setitem(sys.modules, "torch", torch)
     initialize = Mock()
     monkeypatch.setattr(PointPillarsDetector, "initialize", initialize)
-    with pytest.raises(RuntimeError, match="compatibility"):
+    with pytest.raises(worker_module.WorkerInitializationError, match="runtime_profile"):
         WorkerSession()
     initialize.assert_not_called()
 
@@ -608,28 +608,14 @@ def test_worker_reuses_initialized_model_and_validates_both_config_files(monkeyp
         ),
     )
     monkeypatch.setitem(sys.modules, "torch", torch)
-    original_read = Path.read_bytes
-
-    def read(path):
-        if str(path).startswith("/opt/OpenPCDet"):
-            return str(path).encode()
-        return original_read(path)
-
-    monkeypatch.setattr(Path, "read_bytes", read)
-    # Patch only known test bytes' SHA outputs; source identity hashes remain genuine.
-    original_sha = hashlib.sha256
-
-    def sha(raw=b""):
-        from raven.inference.patch_argo import PREIMAGE
-
-        known = {
-            b"/opt/OpenPCDet/pcdet/datasets/__init__.py.bak": PREIMAGE,
-            b"/opt/OpenPCDet/tools/cfgs/kitti_models/pointpillar.yaml": c.MODEL_CONFIG,
-            b"/opt/OpenPCDet/tools/cfgs/dataset_configs/kitti_dataset.yaml": c.BASE_CONFIG,
-        }
-        return SimpleNamespace(hexdigest=lambda: known[raw]) if raw in known else original_sha(raw)
-
-    monkeypatch.setattr(worker_module.hashlib, "sha256", sha)
+    checked_source = {
+        "openpcdet_commit": c.REVISION,
+        "openpcdet_modified_files": ["pcdet/datasets/__init__.py"],
+        "openpcdet_diff_sha256": "a" * 64,
+        "argo_workaround": {"backup_sha256": "b" * 64, "patched_sha256": "c" * 64},
+    }
+    validation = Mock(return_value={"source": checked_source, "gpu_execution": "not_performed"})
+    monkeypatch.setattr(worker_module, "validate_cpu_environment", validation)
     detector = Mock()
     detector.provenance = {
         "openpcdet_commit": c.REVISION,
@@ -639,8 +625,9 @@ def test_worker_reuses_initialized_model_and_validates_both_config_files(monkeyp
     }
     factory = Mock(return_value=detector)
     monkeypatch.setattr(adapter, "PointPillarsDetector", factory)
-    monkeypatch.setattr(worker_module.subprocess, "check_output", lambda *args: b"synthetic patch")
     worker = WorkerSession()
+    validation.assert_called_once_with(Path("/opt/OpenPCDet"))
+    assert worker.metadata["model_provenance"]["argo_workaround"] == checked_source["argo_workaround"]
     detector.initialize.assert_called_once()
     assert worker.metadata["packages"] == c.PACKAGES
     assert factory.call_args.kwargs["checkpoint_sha256"] == c.CHECKPOINT

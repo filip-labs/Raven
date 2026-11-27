@@ -3,23 +3,23 @@
 import hashlib
 import importlib.metadata
 import platform
-import subprocess
 import time
 import uuid
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 from raven.inference.contracts import (
-    BASE_CONFIG,
     CHECKPOINT,
-    MODEL_CONFIG,
     PACKAGES,
     model_identity,
     response_digest,
+    supported_python,
     validate_request,
     validate_response,
 )
+from raven.inference.image_validation import validate_cpu_environment
 from raven.inference.modal_image import recipe_sha256
 from raven.perception.detection.predictions import detections_to_document
 
@@ -31,6 +31,7 @@ def runtime_source_sha256():
         "inference/worker.py",
         "inference/modal_image.py",
         "inference/patch_argo.py",
+        "inference/image_validation.py",
         "perception/detection/pointpillars.py",
         "perception/detection/_openpcdet.py",
         "perception/detection/base.py",
@@ -48,6 +49,23 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
+class WorkerInitializationError(RuntimeError):
+    """Safe phase/cause code for caught startup failures returned through the ordinary method."""
+
+
+@contextmanager
+def startup_stage(stage):
+    try:
+        yield
+    except Exception as exc:
+        # Detailed cause/traceback remains in container logs; no arbitrary remote message is exposed.
+        if isinstance(exc, RuntimeError) and "Checkpoint loading failed" in str(exc):
+            stage = "safe_checkpoint_loading"
+        raise WorkerInitializationError(
+            f"Raven worker initialization failed; stage={stage}; cause={type(exc).__name__}"
+        ) from exc
+
+
 class WorkerSession:
     """One model per container; bounded recent-response replay cache, never persistent exactly-once."""
 
@@ -55,51 +73,49 @@ class WorkerSession:
         started = time.perf_counter()
         import os
 
-        import torch
+        with startup_stage("dependency_import"):
+            import torch
 
         from raven.perception.detection.pointpillars import PointPillarsDetector
 
-        packages = {name: importlib.metadata.version(name) for name in PACKAGES}
-        if (
-            not platform.python_version().startswith("3.10.")
-            or packages != PACKAGES
-            or not torch.cuda.is_available()
-            or torch.version.cuda != "11.8"
-            or torch.cuda.get_device_capability(0) != (7, 5)
-        ):
-            raise RuntimeError("candidate image/GPU compatibility check failed")
+        with startup_stage("runtime_profile"):
+            packages = {name: importlib.metadata.version(name) for name in PACKAGES}
+            if (
+                not supported_python(platform.python_version())
+                or packages != PACKAGES
+                or not torch.cuda.is_available()
+                or torch.version.cuda != "11.8"
+                or torch.cuda.get_device_capability(0) != (7, 5)
+                or torch.cuda.get_device_name(0) != "Tesla T4"
+            ):
+                raise RuntimeError("candidate image/GPU compatibility check failed")
         root = Path("/opt/OpenPCDet")
-        for path, sha in (
-            (root / "tools/cfgs/kitti_models/pointpillar.yaml", MODEL_CONFIG),
-            (root / "tools/cfgs/dataset_configs/kitti_dataset.yaml", BASE_CONFIG),
-        ):
-            if hashlib.sha256(path.read_bytes()).hexdigest() != sha:
-                raise ValueError("worker model configuration checksum mismatch")
-        self.detector = PointPillarsDetector(
-            openpcdet_root=root,
-            config=root / "tools/cfgs/kitti_models/pointpillar.yaml",
-            checkpoint="/weights/pointpillar.pth",
-            checkpoint_sha256=CHECKPOINT,
-            trust_checkpoint=os.environ.get("RAVEN_TRUST_CHECKPOINT") == "1",
-        )
-        self.detector.initialize()
-        provenance = self.detector.provenance
-        if provenance["openpcdet_modified_files"] != ["pcdet/datasets/__init__.py"]:
-            raise ValueError("unexpected upstream source modifications")
-        patch = subprocess.check_output(["git", "-C", str(root), "diff", "--binary", "HEAD", "--"])
-        provenance["openpcdet_diff_sha256"] = hashlib.sha256(patch).hexdigest()
-        from raven.inference.patch_argo import PREIMAGE
-
-        backup = root / "pcdet/datasets/__init__.py.bak"
-        if hashlib.sha256(backup.read_bytes()).hexdigest() != PREIMAGE:
-            raise ValueError("Argoverse workaround backup checksum mismatch")
-        provenance["argo_workaround"] = {
-            "backup_sha256": PREIMAGE,
-            "patched_sha256": hashlib.sha256(
-                (root / "pcdet/datasets/__init__.py").read_bytes()
-            ).hexdigest(),
-        }
-        torch.cuda.synchronize()
+        with startup_stage("dependency_source_validation"):
+            cpu_validation = validate_cpu_environment(root)
+        with startup_stage("model_initialization"):
+            self.detector = PointPillarsDetector(
+                openpcdet_root=root,
+                config=root / "tools/cfgs/kitti_models/pointpillar.yaml",
+                checkpoint="/weights/pointpillar.pth",
+                checkpoint_sha256=CHECKPOINT,
+                trust_checkpoint=os.environ.get("RAVEN_TRUST_CHECKPOINT") == "1",
+            )
+            try:
+                self.detector.initialize()
+                provenance = self.detector.provenance
+                checked = cpu_validation["source"]
+                if (
+                    provenance["openpcdet_commit"] != checked["openpcdet_commit"]
+                    or provenance["openpcdet_modified_files"] != checked["openpcdet_modified_files"]
+                ):
+                    raise ValueError("adapter/source provenance mismatch")
+                provenance.update(checked)
+                provenance["image_cpu_validation"] = cpu_validation
+            except Exception:
+                self.detector.close()
+                raise
+        with startup_stage("cuda_ready"):
+            torch.cuda.synchronize()
         self.load_seconds = time.perf_counter() - started
         self.metadata = {
             "provider": "modal",

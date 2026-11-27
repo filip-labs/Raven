@@ -1,12 +1,13 @@
 """Explicit deployment entry point. Import alone creates no cloud resources."""
 
+import logging
 import os
 
 import modal
 
 from raven.inference.modal_image import build_image
 from raven.inference.modal_transport import check_opt_in
-from raven.inference.worker import WorkerSession
+from raven.inference.worker import WorkerInitializationError, WorkerSession
 
 if modal.is_local():
     check_opt_in()
@@ -42,10 +43,27 @@ app = modal.App("raven-pointpillars")
 class PointPillarsWorker:
     @modal.enter()
     def initialize(self):
-        self.session = WorkerSession()
+        if hasattr(self, "startup_failure"):
+            return
+        self.startup_failure = None
+        try:
+            self.session = WorkerSession()
+        except Exception as exc:
+            logging.getLogger(__name__).exception(
+                "Raven worker initialization failed; no initialization retry in this container"
+            )
+            # Retain text only, never the exception traceback/partial GPU model.
+            self.startup_failure = (
+                str(exc)
+                if isinstance(exc, WorkerInitializationError)
+                else f"Raven worker initialization failed; stage=unclassified_startup; cause={type(exc).__name__}"
+            )
 
     @modal.method()
     def infer(self, request):
+        if self.startup_failure is not None:
+            # Ordinary input exception with retries=0 avoids Modal's @enter crash-reschedule loop.
+            raise WorkerInitializationError(self.startup_failure)
         return self.session.infer(request)
 
     @modal.exit()

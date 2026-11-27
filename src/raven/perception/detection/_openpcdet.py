@@ -184,12 +184,15 @@ class OpenPCDetSession:
         configure_environment()
         sys.path.insert(0, str(self.root))
         try:
-            import pcdet
-            import torch
-            from pcdet.config import cfg, cfg_from_yaml_file
-            from pcdet.datasets import DatasetTemplate
-            from pcdet.models import build_network, load_data_to_gpu
-            from pcdet.utils import common_utils
+            # Upstream pcdet.__init__ runs git in cwd, despite checking .git at its source.
+            # Our session lock already serializes cwd-dependent upstream configuration/imports.
+            with working_directory(self.root):
+                import pcdet
+                import torch
+                from pcdet.config import cfg, cfg_from_yaml_file
+                from pcdet.datasets import DatasetTemplate
+                from pcdet.models import build_network, load_data_to_gpu
+                from pcdet.utils import common_utils
         except ImportError as exc:
             raise RuntimeError(
                 "External GPU dependencies are unavailable. See docs/pointpillars-adapter.md; "
@@ -260,6 +263,8 @@ class OpenPCDetSession:
                     "gpu_driver": command_output(
                         ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"]
                     ),
+                    "spconv_cu118": package_version("spconv-cu118"),
+                    "cumm_cu118": package_version("cumm-cu118"),
                     "spconv_cu126": package_version("spconv-cu126"),
                     "cumm_cu126": package_version("cumm-cu126"),
                     "numpy": np.__version__,
