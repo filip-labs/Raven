@@ -2,6 +2,7 @@
 
 import hashlib
 import importlib.metadata
+import math
 import os
 import pickle
 import platform
@@ -41,8 +42,19 @@ def plain_config(value):
         return [plain_config(item) for item in value]
     if isinstance(value, Path):
         return str(value)
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
+    if value is None:
+        return None
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, str):
+        return str(value)
+    if isinstance(value, (int, np.integer)):
+        return int(value)
+    if isinstance(value, (float, np.floating)):
+        number = float(value)
+        if not math.isfinite(number):
+            raise ValueError("Configuration numbers must be finite")
+        return number
     raise ValueError(f"Unsupported configuration value: {type(value).__name__}")
 
 
@@ -58,7 +70,7 @@ def working_directory(path: Path):
 
 def package_version(name: str) -> str | None:
     try:
-        return importlib.metadata.version(name)
+        return str(importlib.metadata.version(name))
     except importlib.metadata.PackageNotFoundError:
         return None
 
@@ -257,8 +269,10 @@ class OpenPCDetSession:
             metadata = {
                 "environment": {
                     "python": platform.python_version(),
-                    "pytorch": torch.__version__,
-                    "torch_cuda_runtime": torch.version.cuda,
+                    "pytorch": str(torch.__version__),
+                    "torch_cuda_runtime": None
+                    if torch.version.cuda is None
+                    else str(torch.version.cuda),
                     "cuda_toolkit_nvcc": command_output(["nvcc", "--version"]),
                     "gpu_driver": command_output(
                         ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"]
@@ -267,12 +281,14 @@ class OpenPCDetSession:
                     "cumm_cu118": package_version("cumm-cu118"),
                     "spconv_cu126": package_version("spconv-cu126"),
                     "cumm_cu126": package_version("cumm-cu126"),
-                    "numpy": np.__version__,
-                    "openpcdet": pcdet.__version__,
-                    "gpu": torch.cuda.get_device_name(self.device_index),
-                    "compute_capability": list(torch.cuda.get_device_capability(self.device_index)),
-                    "visible_gpu_count": torch.cuda.device_count(),
-                    "device_index": self.device_index,
+                    "numpy": str(np.__version__),
+                    "openpcdet": str(pcdet.__version__),
+                    "gpu": str(torch.cuda.get_device_name(self.device_index)),
+                    "compute_capability": [
+                        int(v) for v in torch.cuda.get_device_capability(self.device_index)
+                    ],
+                    "visible_gpu_count": int(torch.cuda.device_count()),
+                    "device_index": int(self.device_index),
                     "environment_flags": {
                         key: os.environ[key]
                         for key in (

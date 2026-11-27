@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from raven.core.point_cloud import PointCloud
+from raven.inference.json_native import validate_json_native
 from raven.perception.detection.predictions import detections_from_document
 
 MAX_POINTS = 2_000_000
@@ -218,6 +219,7 @@ def validate_response(response, request):
 
 def validate_response_metadata(response, request):
     validate_request_metadata(request)
+    validate_json_native(response)
     if len(canonical(response)) > MAX_RESPONSE_BYTES:
         raise ValueError("oversized response")
     keys(

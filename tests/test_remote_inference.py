@@ -24,6 +24,7 @@ from raven.experiments.config import ExperimentConfig, ModalConfig
 from raven.inference import contracts as c
 from raven.inference.detector import RemoteDetector
 from raven.inference.evidence import validate_remote_evidence
+from raven.inference.json_native import normalize_json_containers
 from raven.inference.modal_image import image_spec, recipe_sha256
 from raven.inference.modal_transport import (
     ModalTransport,
@@ -90,6 +91,7 @@ def make_response(request):
             "gpu_synchronized": True,
         },
     }
+    response = normalize_json_containers(response)
     response["response_sha256"] = c.response_digest(response)
     return response
 
@@ -517,6 +519,7 @@ class Block(importlib.abc.MetaPathFinder):
             raise AssertionError('forbidden import '+name)
 sys.meta_path.insert(0, Block())
 from raven.inference.detector import RemoteDetector
+from raven.inference.json_native import normalize_json_containers
 from raven.inference.worker import runtime_source_sha256
 from raven.experiments.runner import run_experiment
 from raven.evaluation.evaluate import evaluate_experiment
@@ -627,7 +630,9 @@ def test_worker_reuses_initialized_model_and_validates_both_config_files(monkeyp
     monkeypatch.setattr(adapter, "PointPillarsDetector", factory)
     worker = WorkerSession()
     validation.assert_called_once_with(Path("/opt/OpenPCDet"))
-    assert worker.metadata["model_provenance"]["argo_workaround"] == checked_source["argo_workaround"]
+    assert (
+        worker.metadata["model_provenance"]["argo_workaround"] == checked_source["argo_workaround"]
+    )
     detector.initialize.assert_called_once()
     assert worker.metadata["packages"] == c.PACKAGES
     assert factory.call_args.kwargs["checkpoint_sha256"] == c.CHECKPOINT

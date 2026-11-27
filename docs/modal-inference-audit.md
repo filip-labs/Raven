@@ -1,9 +1,15 @@
 # Modal dependency/startup audit — 2026-11-27
 
-Scope: audit and repair existing RV-049 PR #77 before another potentially billable
-attempt. All validation in this audit is local/static/CPU or read-only account
-inspection. No new image build, deployment, GPU call or checkpoint upload was run.
-No checkpoint bytes were read locally. RV-049 is not complete based on these checks.
+This document preserves the initial dependency/startup audit and the subsequent
+response-serialization investigation. The initial audit was local/read-only. One
+separately authorized live attempt later completed genuine GPU inference but
+failed Raven client deserialization. The serialization repair is local-only and
+has not been deployed or validated with another GPU call. RV-049 remains open.
+See the [latest findings](#response-serialization-repair-and-offline-recovery).
+
+The sections preceding those findings describe the initial audit and its proposed
+bounded live stage; they are historical evidence, not authorization for another
+attempt. No checkpoint bytes were read locally during either repair.
 
 ## Actual failures and prioritized findings
 
@@ -211,3 +217,85 @@ source fingerprints. Historical remote archives must retain the matching Raven
 revision/profile for strict validation; they are not silently reinterpreted as
 executions of this corrected image. Existing source schemas and M5 APIs are
 unchanged. No old archive is rewritten or re-signed by the audit.
+
+
+## Response serialization repair and offline recovery
+
+### Confirmed live evidence and failure
+
+The single approved build/deployment on producer commit
+`e2b206d1e70f271d12b17f66ef13517d7965d70b` passed the real Linux image gate.
+FunctionCall `fc-01M8EQ2T756DH2RNW5KABA1G91` completed on Tesla T4, capability 7.5:
+29 detections (4 Car, 19 Pedestrian, 6 Cyclist) for frame `000000`, in
+`kitti_velodyne`. Python was 3.10.13, PyTorch 2.2.2+cu118 and torchvision
+0.17.2+cu118. The pinned OpenPCDet revision, package inventory, model/config and
+checkpoint identities match the reviewed profile. Safe loading remained enabled.
+The app was stopped after the attempt; no resubmission occurred.
+
+The CPU client raised `DeserializationError` because nested
+`worker.model_provenance.environment.pytorch` retained a PyTorch `TorchVersion`
+string subclass. The preserved raw result's disassembly identifies this as its
+only external class/global dependency. Geometry tuples were also present: legal
+for ordinary JSON encoding, but outside the new exact JSON-native RPC boundary.
+Installing Torch on the client would conceal the boundary defect.
+
+Observed worker-only times: model initialization **13.680662077 s**, synchronized
+adapter detection **1.166451485 s**, worker request **1.174442966 s** (excludes
+initialization). These are single-call observations. Raven end-to-end execution
+failed; no successful client end-to-end latency, benchmark, AP or accuracy is
+claimed. Equal historical class counts do not establish numerical equivalence.
+
+### Local repair and regression coverage
+
+Framework/distribution versions are explicitly normalized to built-in strings at
+their sources. Effective configuration scalars become native finite JSON values.
+The worker normalizes exact tuples into lists and validates the complete nested
+response before hashing/return, and validates cached responses. The client and
+persisted-evidence validator also reject non-native types. The exact-type recursive
+checker rejects subclasses, unknown objects and nonfinite numbers without generic
+stringification or pickle hooks. Response/prediction schemas and checksum
+algorithms are unchanged; the source fingerprint changes with the implementation
+and covers the new checker. No historical fingerprint is rewritten or accepted
+through an override.
+
+Synthetic regressions exercise the actual adapter provenance producer with a
+TorchVersion-like subtype, the full worker response, pickle deserialization in a
+fresh process with Torch/PCDet/spconv/cumm/Open3D/Modal imports blocked, and native
+client validation, RV-031 persistence, RV-034 export and RV-035 verification/CPU
+replay. Synthetic flags remain explicit and block accuracy evaluation. Additional
+cases cover nested unknown/subclass values, nonfinite numbers, exact keys,
+cycles/depth, tuple/hash equivalence, cache corruption and profile mismatch.
+These tests establish local transport correctness, not another GPU execution.
+
+### Diagnostic archive and limits
+
+The earlier read-only recovery preserved the original opaque result and allowed
+only the known TorchVersion-to-string conversion, without importing Torch or
+loading the checkpoint. This stage uses the recovered JSON only: no pickle load,
+SDK call, build, deployment or inference. The ignored local archive is
+`outputs/rv049-serialization/recovered-diagnostic-archive/`. It contains the
+unchanged recovered response/checksum, opaque raw result/disassembly, original
+failed-run artifacts copied byte-for-byte, historical producer source snapshot,
+validation report, archival script and SHA256/size inventory. Dataset/model files,
+billing data and credentials are excluded. Both failed-run directories and the
+original diagnostic case were inventoried before/after and remain unchanged.
+
+Offline checks validate exact native/finite JSON, the original response digest,
+Detection3D geometry/frame/schema, class counts, input hash against the failed-run
+record, model/checkpoint/config identities, pinned runtime, worker timing fields
+and producer source/recipe fingerprints recomputed from Git blobs. Raw-result
+SHA256 is `fd47896f42ab3d8dd2c4ceaf6e954c83c8930f84ec1349b8c9fae8ce640ff698`.
+
+**Limitation:** complete original request metadata was not saved after the client
+failure. Its envelope digest/bindings cannot be independently revalidated; no
+request is fabricated. The archive is diagnostic evidence, neither an RV-031
+successful run nor an RV-034 completed-run export. Current production validators
+retain their original strict request/profile requirements. The native run remains
+failed and has no successful end-to-end timing. A new live validation of the repair
+requires separate explicit authorization; no such action occurred in this stage.
+
+Local repair validation: **1556 passed, 5 skipped** in 36.65 s (30 new
+serialization cases). Ruff, `pip check` and `git diff --check` pass. The only
+warning is the existing third-party Dash pytest deprecation. Cloud opt-in gates
+were disabled for the test run. CI results belong to their reported commit and
+must be checked separately from this local result.

@@ -6,15 +6,20 @@ Local OpenPCDet and saved-baseline modes retain their schema-v1 behavior. Modal
 uses an explicit **experiment configuration schema v2**, request/response v1 and
 the existing prediction schema v1. Run artifacts remain run-schema-v1.
 
-**Validation status, 2026-11-27:** the owner reports that the earlier image built
-and deployed, but the first real request failed in worker initialization on a
-missing `torchvision` import, with repeated container startup errors and no
-completed inference. The failed run is retained. This repair adds a corrected
-candidate recipe, CPU build-time validation and startup-failure handling; no new
-cloud build, deployment, asset upload or GPU inference was performed during the
-audit. See the [root-cause audit and validation gates](modal-inference-audit.md).
-Real PointPillars-on-Modal acceptance remains open. Historical Kaggle results and
-synthetic local responses are not evidence of a successful Modal execution.
+**Validation status, 2026-11-27:** one genuine T4 inference completed on
+producer commit `e2b206d1e70f271d12b17f66ef13517d7965d70b`, returning 29 boxes
+(Car 4, Pedestrian 19, Cyclist 6) for KITTI frame `000000`. Raven then failed
+response deserialization because nested PyTorch version provenance contained a
+`torch.torch_version.TorchVersion` object. The native end-to-end run remains
+**failed**. The prior missing-torchvision/startup incident is separate historical
+evidence, retained unchanged.
+
+The local serialization repair converts framework version values to native
+strings and enforces exact JSON-native response types. It has CPU-only regression
+coverage, including a Torch-free subprocess and the client/persistence/export
+path. It has **not** been deployed or rerun on a GPU. No cloud operation is part
+of this repair; another live run requires separate explicit authorization.
+See [serialization and recovered-evidence findings](modal-inference-audit.md#response-serialization-repair-and-offline-recovery).
 
 ## Architecture and ownership
 
@@ -454,15 +459,12 @@ Reports and the smoke script remain ignored under `outputs/rv049-m5/`.
 
 #### Remaining live-validation requirements
 
-Local integration is ready for review. It is not clearance to deploy. A separately
-authorized live smoke still requires dataset/checkpoint cloud-use rights, verified
-workspace/profile access and budget, private permitted asset storage, candidate
-image build/boot on T4, safe-loading validation, actual returned output/provenance
-and usage/billing evidence. Do not assume clearance from a hash or public model
-link. No checkpoint or dataset is distributed with Raven. Genuine GPU behavior,
-remote cold start, output counts, accuracy, remote latency distributions and
-cross-environment numerical equivalence remain unverified. No cloud operations
-were performed in this integration.
+The separately approved attempt subsequently confirmed real GPU inference, but
+failed the CPU client's response deserialization. The local repair below needs a
+new separately authorized live end-to-end validation. Require fresh account,
+budget, asset-rights and original-call/app-state checks before any execution.
+No checkpoint or dataset is distributed with Raven. Accuracy, latency
+distributions and cross-environment numerical equivalence remain unverified.
 
 
 ## Corrected image build and startup gates
@@ -514,3 +516,31 @@ limitations, including [CVE-2025-32434](https://github.com/pytorch/pytorch/secur
 untrusted content. Preserve the exact trusted checkpoint identity and private
 asset boundary. Modernizing Python/Torch/SDK and revalidating native extensions is
 a separate task; this audit does not certify the legacy image as security-current.
+
+
+## Response serialization boundary
+
+Known framework/distribution version values are converted to built-in `str` at
+production in `_openpcdet.py` (including nested effective-config scalars) and the
+worker's package inventory. GPU capability/device fields are built-in integers.
+The worker copies exact tuple geometry/config containers into lists before
+hashing the response; JSON already represents both as arrays, so the canonical
+checksum algorithm and schemas are unchanged. Geometry, scores, thresholds and
+model/checkpoint identities are unchanged.
+
+`raven.inference.json_native.validate_json_native()` recursively accepts only
+exact built-in `None`, `bool`, `int`, finite `float`, `str`, `list` and `dict`,
+with exact `str` keys. Scalar/container subclasses, NumPy scalars, arrays,
+paths, tensors, bytes, unknown objects, cycles and nesting beyond 64 levels are
+rejected with a value path. Normalization handles exact tuples only; there is
+no general `default=str` or tensor conversion. Full outgoing responses, including
+nested provenance, are checked before return/cache; cache hits and incoming
+client/persisted response validation are checked as well.
+
+The runtime source fingerprint now includes this boundary module. Historical
+records retain their original fingerprints and require their matching producer
+revision; current validators do not accept an arbitrary historical profile.
+The recovered incident response can be inspected offline as diagnostic evidence,
+with limitations described in the audit. It cannot be promoted into a successful
+experiment or completed-run export because the original request envelope was not
+saved. Never reconstruct that envelope or invent successful end-to-end timing.

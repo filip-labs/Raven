@@ -20,6 +20,7 @@ from raven.inference.contracts import (
     validate_response,
 )
 from raven.inference.image_validation import validate_cpu_environment
+from raven.inference.json_native import normalize_json_containers
 from raven.inference.modal_image import recipe_sha256
 from raven.perception.detection.predictions import detections_to_document
 
@@ -28,6 +29,7 @@ def runtime_source_sha256():
     root = Path(__file__).resolve().parents[1]
     names = [
         "inference/contracts.py",
+        "inference/json_native.py",
         "inference/worker.py",
         "inference/modal_image.py",
         "inference/patch_argo.py",
@@ -79,7 +81,7 @@ class WorkerSession:
         from raven.perception.detection.pointpillars import PointPillarsDetector
 
         with startup_stage("runtime_profile"):
-            packages = {name: importlib.metadata.version(name) for name in PACKAGES}
+            packages = {name: str(importlib.metadata.version(name)) for name in PACKAGES}
             if (
                 not supported_python(platform.python_version())
                 or packages != PACKAGES
@@ -117,18 +119,20 @@ class WorkerSession:
         with startup_stage("cuda_ready"):
             torch.cuda.synchronize()
         self.load_seconds = time.perf_counter() - started
-        self.metadata = {
-            "provider": "modal",
-            "worker_id": uuid.uuid4().hex,
-            "image_recipe_sha256": recipe_sha256(),
-            "gpu": torch.cuda.get_device_name(0),
-            "compute_capability": list(torch.cuda.get_device_capability(0)),
-            "python": platform.python_version(),
-            "packages": packages,
-            "cuda_runtime": torch.version.cuda,
-            "model_provenance": provenance,
-            "raven_source_sha256": runtime_source_sha256(),
-        }
+        self.metadata = normalize_json_containers(
+            {
+                "provider": "modal",
+                "worker_id": uuid.uuid4().hex,
+                "image_recipe_sha256": recipe_sha256(),
+                "gpu": str(torch.cuda.get_device_name(0)),
+                "compute_capability": [int(v) for v in torch.cuda.get_device_capability(0)],
+                "python": platform.python_version(),
+                "packages": packages,
+                "cuda_runtime": str(torch.version.cuda),
+                "model_provenance": provenance,
+                "raven_source_sha256": runtime_source_sha256(),
+            }
+        )
         self.cache = {}
 
     def infer(self, request):
@@ -141,6 +145,7 @@ class WorkerSession:
             envelope, response = self.cache[key]
             if envelope != request["request_sha256"]:
                 raise ValueError("request ID reused for different input")
+            validate_response(response, request)
             return deepcopy(response)
         torch.cuda.synchronize()
         detect_started = time.perf_counter()
@@ -156,7 +161,7 @@ class WorkerSession:
             "input_sha256": request["input"]["sha256"],
             "model": model_identity(),
             "predictions": detections_to_document(predictions, frame_id=cloud.frame_id),
-            "worker": deepcopy(self.metadata),
+            "worker": self.metadata,  # Copied/checked by normalize_json_containers below.
             "timings": {
                 "worker_started_at_utc": utc,
                 "worker_finished_at_utc": now(),
@@ -167,6 +172,7 @@ class WorkerSession:
                 "gpu_synchronized": True,
             },
         }
+        response = normalize_json_containers(response)
         response["response_sha256"] = response_digest(response)
         validate_response(response, request)
         if len(self.cache) == 16:
