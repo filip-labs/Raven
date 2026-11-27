@@ -6,14 +6,15 @@ Local OpenPCDet and saved-baseline modes retain their schema-v1 behavior. Modal
 uses an explicit **experiment configuration schema v2**, request/response v1 and
 the existing prediction schema v1. Run artifacts remain run-schema-v1.
 
-**Validation status, 2026-11-26:** CPU contracts/runner/evaluator integration and
-the pinned SDK's local application-definition construction were checked. No
-Modal image was built, no worker deployed, no asset uploaded and no GPU inference
-executed for this task. The image is a **candidate**, not a GPU-validated lockfile.
-No configured Modal profile/token pair was available; actual workspace credits,
-usage/spend limits, deployment and asset-use clearance could not be verified.
-Mock tests below are not evidence of real model execution. RV-049's real execution
-acceptance remains open until the separate bounded smoke test succeeds.
+**Validation status, 2026-11-27:** the owner reports that the earlier image built
+and deployed, but the first real request failed in worker initialization on a
+missing `torchvision` import, with repeated container startup errors and no
+completed inference. The failed run is retained. This repair adds a corrected
+candidate recipe, CPU build-time validation and startup-failure handling; no new
+cloud build, deployment, asset upload or GPU inference was performed during the
+audit. See the [root-cause audit and validation gates](modal-inference-audit.md).
+Real PointPillars-on-Modal acceptance remains open. Historical Kaggle results and
+synthetic local responses are not evidence of a successful Modal execution.
 
 ## Architecture and ownership
 
@@ -23,7 +24,8 @@ acceptance remains open until the separate bounded smoke test succeeds.
   `provenance`, `close`) over an injectable `submit(request)` transport and response-profile validator. One model
   abstraction, no second experiment runner.
 - `ModalTransport`: optional lazy SDK import, authenticated deployed-class lookup,
-  one application-level submission, bounded result wait and cancellation attempt.
+  one application-level submission, bounded result wait and terminating cancellation attempt.
+  Lookup/submission/cancellation are not covered by the result-wait timeout.
 - `WorkerSession`: one existing `PointPillarsDetector` initialized per worker,
   synchronized detection, actual model/environment provenance and replay handling.
 - `providers/modal/app.py`: deployment policy and lifecycle hooks. Fixed T4,
@@ -52,9 +54,9 @@ resolved from `nvidia/cuda:11.8.0-devel-ubuntu22.04`. There is no GPU fallback.
 
 | Component | Candidate pin |
 | --- | --- |
-| Python | 3.10.16 |
+| Python | 3.10.x; Modal `add_python="3.10"`, actual numeric patch recorded |
 | CUDA toolkit / Torch runtime | 11.8 / 11.8 |
-| PyTorch | 2.2.2+cu118 |
+| PyTorch / torchvision | 2.2.2+cu118 / 0.17.2+cu118 |
 | spconv / cumm | spconv-cu118 2.3.6 / cumm-cu118 0.4.11 |
 | NumPy | 1.26.4 |
 | OpenPCDet | 233f849829b6ac19afb8af8837a0246890908755; package 0.6.0+233f849 |
@@ -66,8 +68,15 @@ provides the 2.2.2 CUDA 11.8 build. [spconv's installation documentation](https:
 includes CUDA 11.8 wheels. PyPI metadata for
 [spconv-cu118 2.3.6](https://pypi.org/project/spconv-cu118/2.3.6/) requires
 cumm-cu118 >=0.4.5,<0.5.0; the selected 0.4.11 has a Linux CPython 3.10 wheel.
-This verifies package availability/declared compatibility, **not** that extensions
-build or inference works on Modal. All actual Python/core package/CUDA/GPU
+The [official PyTorch version matrix](https://pytorch.org/get-started/previous-versions/#v222)
+selects torchvision 0.17.2 for Torch 2.2.2 on CUDA 11.8. Both exact CUDA builds are
+installed in one pip step from the CUDA 11.8 index; later installs retain the exact
+reviewed runtime pins. `image-spec.json` is the shared source for installation,
+build validation, worker package provenance and response validation. It also pins
+llvmlite 0.42.0, Pillow 10.4.0 and the existing directly required dependency set.
+Unused pandas was removed from this PointPillars profile; optional CaDDN/Argoverse/
+dynamic-voxel dependencies are not installed speculatively. This verifies package
+availability/declared compatibility, **not** that extensions build or inference works on Modal. All actual Python/core package/CUDA/GPU
 identities are checked before accepting a worker result. Unexpected identities
 fail; the historical Kaggle Python 3.13/CUDA 13 stack is not silently reused.
 
@@ -273,8 +282,11 @@ actual config/preprocessing identity and exact processed-input binding. A change
 response, source hash, frame or experiment cannot silently contribute metrics.
 
 The client never resubmits automatically after transport/timeout/auth failures.
-It attempts cancellation of an existing handle, records its safe call ID when
-available, and reports uncertain outcomes. Failed cancellation does not imply the
+For an uncertain existing handle it requests
+`cancel(terminate_containers=True)`, records its safe call ID when available, and
+reports uncertainty. An acknowledged cancellation is not terminal-state proof.
+Definitive worker-initialization/method-timeout errors are reported as failed
+without requesting cancellation of an already finished input. Failed cancellation does not imply the
 worker stopped; inspect the app/call and stop it. The SDK/provider may internally
 retry RPCs or replay inputs after container loss, even with application retries=0.
 A recent 16-response in-memory worker cache returns the same result for the same
@@ -395,8 +407,9 @@ ignore of remote provenance is used.
 
 #### Recorded local checks
 
-Full merged CPU suite: **1489 passed, 5 skipped**, including 20 new M5 compatibility
-cases beyond the 72 original Modal CPU cases. Five skips are the existing four
+The M5 integration baseline was **1489 passed, 5 skipped**, including 20 M5
+compatibility cases beyond the 72 original Modal CPU cases. After the startup/
+dependency audit: **1526 passed, 5 skipped** (37 additional audit cases). Five skips are the existing four
 optional checks plus the opt-in live Modal test. Ruff, `pip check` and full diff
 checks pass. A third-party Dash pytest deprecation warning is unrelated to Raven.
 Tests cover legacy v1 through the existing suites and explicit v2, processed input
@@ -450,3 +463,54 @@ link. No checkpoint or dataset is distributed with Raven. Genuine GPU behavior,
 remote cold start, output counts, accuracy, remote latency distributions and
 cross-environment numerical equivalence remain unverified. No cloud operations
 were performed in this integration.
+
+
+## Corrected image build and startup gates
+
+The existing Clang and `/root` PYTHONPATH fixes are retained. After editable
+OpenPCDet installation and the guarded Argoverse patch, the image runs `pip check`
+and `python -m raven.inference.image_validation`. This checks exact package/Python
+identity, source checkout/revision/diff, both YAML hashes, exact patch/backup
+content, required imports, all seven OpenPCDet native extension imports,
+Torch/torchvision CUDA-build pairing, CPU torchvision NMS dispatch, configuration
+parsing and a two-point CPU voxelization fixture. It does not load a checkpoint,
+construct the CUDA-anchor model or run a GPU kernel. Failure stops the image build
+before GPU container startup. The approved build must actually execute this gate;
+mocked unit checks are not evidence that the Linux gate passed.
+
+Worker startup reruns dependency/source validation and checks T4/capability 7.5,
+CUDA runtime 11.8, actual Python/package identities, model config hashes and private
+checkpoint identity before accepting predictions. The adapter still defaults to
+safe `weights_only=True` loading. A refusal of legacy checkpoint contents must
+stop the attempt; do not automatically attach a trusted-loading Secret.
+
+Caught initialization exceptions are logged once and retained as phase/cause text
+by `@modal.enter`. `infer` raises that failure as an ordinary method error with
+`retries=0`, without reinitializing the model. This addresses catchable dependency/
+model startup crash loops. It cannot prevent provider rescheduling after a killed,
+OOM, startup-timeout or native-crashed process; see
+[Modal crash handling](https://modal.com/docs/guide/retries). Do not describe
+`retries=0` or max one container as a total-cost guarantee.
+
+The example config now waits up to 600 seconds **for the result**, while the
+worker retains separate 300-second startup and 180-second execution timeouts.
+Schema bounds/defaults are otherwise unchanged. This is not a 600-second end-to-end
+wall-clock cap. Scheduling, lookup, submission and cancellation have SDK/provider
+behavior outside that result wait; see [Modal timeouts](https://modal.com/docs/guide/timeouts).
+Failure records distinguish startup phase, client-result timeout, remote execution
+timeout, auth/transport failures and uncertain cancellation. Never resubmit after
+an uncertain outcome without first inspecting the original FunctionCall.
+
+Before any corrected cloud build/deploy/GPU call, freshly verify the intended
+workspace, credits/usage/spend limits, original call terminal state, stopped app
+and absence of active containers, and obtain explicit operator approval. Read-only
+CLI checks do not authorize execution or independently prove asset rights. Keep
+the existing private weights Volume; no repeat upload is part of this repair.
+
+
+The pinned legacy Torch release also has known checkpoint-loader security
+limitations, including [CVE-2025-32434](https://github.com/pytorch/pytorch/security/advisories/GHSA-53q9-r3pm-6pq6).
+`weights_only=True` remains the default but must not be treated as isolation for
+untrusted content. Preserve the exact trusted checkpoint identity and private
+asset boundary. Modernizing Python/Torch/SDK and revalidating native extensions is
+a separate task; this audit does not certify the legacy image as security-current.
