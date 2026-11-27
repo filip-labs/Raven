@@ -157,7 +157,9 @@ saved-run integrity, exclusive prediction copies, raw/processed binding refusal,
 Qt navigation/async states, missing optional dependencies, command/environment
 construction, process failures, duplicate prevention and shutdown cleanup.
 The standard CPU CI remains Qt-free; a separate job installs only `dev,studio`
-and runs offscreen integration. No test requires a GPU, credentials or KITTI data.
+and runs offscreen integration. Its Linux runner installs the EGL/OpenGL loader
+libraries required to import Qt; no CUDA or NVIDIA runtime is installed. No test
+requires a GPU, credentials or KITTI data.
 
 Actual macOS validation during implementation:
 
