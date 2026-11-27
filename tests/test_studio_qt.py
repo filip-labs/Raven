@@ -290,7 +290,6 @@ def test_refined_controls_keep_native_mouse_keyboard_and_clean_rendering(app):
     check = QCheckBox("Ground truth")
     combo = ComboBox()
     try:
-        apply_theme(app)
         check.show()
         check.setFocus()
         app.processEvents()
