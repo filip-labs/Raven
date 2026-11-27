@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "name": "Bounded Modal PointPillars smoke",
+  "experiment_id": "modal-smoke-000000-001",
+  "dataset": {"root": "/path/to/kitti", "split": "train"},
+  "frames": {"ids": ["000000"]},
+  "model": {
+    "name": "pointpillars",
+    "source": "modal",
+    "remote": {
+      "app": "raven-pointpillars",
+      "environment": "main",
+      "worker_class": "PointPillarsWorker",
+      "timeout_seconds": 600,
+      "max_frames": 1
+    }
+  },
+  "preprocessing": [],
+  "seed": 42,
+  "output": {"directory": "/path/to/outputs", "artifact_prefix": "modal"}
+}

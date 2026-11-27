@@ -53,8 +53,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     experiment = sub.add_parser(
         "inspect-experiment", help="Validate experiment JSON and inspect identity/frame selection"
     )
-    experiment.add_argument("path", help="Path to a schema-v1 experiment JSON configuration")
-    run = sub.add_parser("run-experiment", help="Preflight and execute a schema-v1 experiment")
+    experiment.add_argument("path", help="Path to a schema-v1 or schema-v2 experiment JSON configuration")
+    run = sub.add_parser("run-experiment", help="Preflight and execute a schema-v1 or schema-v2 experiment")
     run.add_argument("path", help="Path to experiment JSON")
     run.add_argument("--dry-run", action="store_true", help="Preflight only; create no artifacts")
     evaluation = sub.add_parser(

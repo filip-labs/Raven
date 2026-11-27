@@ -231,3 +231,25 @@ initialization reuse/failure, immutable input, multiple/empty predictions,
 serialization through an actual adapter call, JIT flags, and resource handling.
 A fresh interpreter blocks GPU/GUI imports during adapter import/construction.
 CPU tests do not substitute for per-box reference comparison or a new GPU run.
+
+
+## Modal candidate import and provenance audit
+
+The optional [Modal profile](modal-inference.md) uses a separate reviewed Python
+3.10.x / Torch 2.2.2+cu118 / torchvision 0.17.2+cu118 environment. It does not change
+the historical Kaggle environment or install GPU packages into normal Raven.
+The corrected candidate must pass its CPU image import/native/config checks before
+an authorized GPU smoke. The final Modal frame-000000 smoke on `35e47ea`
+successfully loaded the pinned checkpoint and executed CUDA inference, returning
+29 validated detections through Raven. See the [recorded evidence and limits](modal-inference.md#verified-end-to-end-smoke--2026-11-27); no new GPU call is
+part of finalization.
+
+At the pinned upstream revision, `pcdet/__init__.py` checks for `.git` adjacent to
+its source, then runs `git rev-parse HEAD` in the process's current directory.
+Importing from an unrelated directory can emit `fatal: not a git repository` and
+produce incorrect version suffix metadata even when `/opt/OpenPCDet/.git` exists.
+Initialization now imports upstream code while temporarily in the verified
+checkout root under the existing session lock, then restores the caller's cwd.
+The independent `git -C ROOT` revision and tracked-modification checks remain in
+place. No commit identity is hardcoded as an observed result and no additional
+upstream code patch is applied. See the [audit evidence](modal-inference-audit.md).

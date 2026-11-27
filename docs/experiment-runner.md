@@ -283,3 +283,12 @@ be represented as successful evaluations. Test is currently blocked/unlabeled.
 RV-032 adds metrics and matching/ignore policy; RV-033 adds proper timing;
 RV-034 adds broader export; RV-035 adds dedicated reproducibility coverage.
 RV-031 does not compute AP/mAP, benchmark latency, train models or redesign views.
+
+## Optional remote source (RV-049)
+
+The same runner also accepts the explicit schema-v2 Modal configuration described
+in [Modal inference](modal-inference.md). Local preprocessing precedes a validated
+remote ObjectDetector call, with no saved/local fallback. Run artifacts remain
+schema v1 and embed configuration v2, processed-cloud identity and remote
+request/response provenance. Any remote frame failure aborts remaining submissions
+and fails the run. Legacy v1 sources retain their existing behavior.

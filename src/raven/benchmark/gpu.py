@@ -6,6 +6,10 @@ from types import SimpleNamespace
 
 class LocalCudaBackend:
     def __init__(self, config):
+        if config.model.source == "modal":
+            raise RuntimeError(
+                "local CUDA benchmarking requires source=inference; Modal is remote, not local CUDA inference"
+            )
         if config.model.source != "inference":
             raise RuntimeError(
                 "saved predictions are not fresh inference; select local inference source"

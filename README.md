@@ -369,6 +369,20 @@ requirements, typed evidence and limitations. Missing metadata is blocked; train
 smoke is explicit. No official-server equivalence or full validation accuracy is
 claimed from the local frame-000000 evidence.
 
+## Optional Modal remote inference
+
+The existing experiment runner supports an explicit schema-v2 Modal source via
+a provider-neutral remote detector, with processed-input hashes, strict validated
+predictions and provenance compatible with KITTI evaluation. Local/saved v1 modes
+remain available. See the [Modal setup, spending controls and validation status](docs/modal-inference.md)
+and `configs/experiments/modal-pointpillars.json`. Cloud execution is opt-in; the
+final frame-000000 smoke completed genuine Tesla T4 inference and persisted 29
+validated detections; offline integrity/input/preprocessing checks passed. This
+one-frame training smoke establishes no accuracy or latency benchmark.
+Modal artifacts integrate with results export and bounded CPU reproducibility
+checks; synthetic remote records remain labeled synthetic and do not yield GPU
+accuracy claims. Repeated remote benchmarking remains separate from local CUDA.
+
 ## Local latency benchmarking
 
 `raven benchmark-experiment CONFIG.json` measures existing preprocessing with

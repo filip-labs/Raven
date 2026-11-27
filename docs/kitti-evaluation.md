@@ -287,3 +287,13 @@ and exact IDs; evaluator wall time is not detector latency. RV-034 can consume t
 typed schema without turning null/unavailable metrics into zeros or mixing training
 smoke with validation results. Changes to protocols/dependencies require new
 reference validation/versioning, not silently reusing this adapter's identity.
+
+## Remote execution evidence (RV-049)
+
+Schema-v2 Modal runs use this same evaluator and unchanged protocol. The input
+boundary additionally verifies the remote response, worker/source/model identity
+and binding to the exact experiment configuration, preprocessing digest, frame,
+processed point count and XYZI hash. Evaluation makes no remote call and does not
+rerun preprocessing. Hashes are consistency evidence, not independent hardware
+attestation. Required genuine calibration/images/splits and all availability rules
+above still apply. See the [Modal guide](modal-inference.md).
