@@ -16,6 +16,8 @@ preprocessing = ["scipy>=1.10,<2"]
 dev = ["pytest>=8", "ruff>=0.6", "scipy>=1.10,<2", "shapely==2.1.2"]
 evaluation = ["shapely==2.1.2"]
 modal = ["modal==1.6.4"]
+# 6.12.0 can abort Python 3.11 with a binding-level None refcount failure.
+studio = ["PySide6-Essentials>=6.8,!=6.12.0,<7"]
 
 [project.scripts]
 raven = "raven.cli:main"

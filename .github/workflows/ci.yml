@@ -19,3 +19,23 @@ jobs:
         run: python -m ruff check .
       - name: Tests
         run: python -m pytest -q
+  studio-tests:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      RAVEN_ALLOW_MODAL_GPU: '0'
+      RAVEN_MODAL_ASSET_RIGHTS_CONFIRMED: '0'
+      RAVEN_MODAL_SMOKE_CONFIG: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Qt offscreen system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libegl1 libopengl0
+      - name: Install optional Studio widgets
+        run: python -m pip install -e '.[dev,studio]'
+      - name: Headless Studio integration
+        run: python -m pytest -q tests/test_studio_services.py tests/test_studio_qt.py
