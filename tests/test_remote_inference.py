@@ -533,7 +533,7 @@ assert len(runtime_source_sha256()) == 64
 def test_image_spec_keeps_cuda_stack_consistent_and_has_no_assets():
     spec = image_spec()
     assert spec["base"].startswith("nvidia/cuda@sha256:")
-    assert spec["python"] == "3.10.16" and spec["torch"] == "2.2.2+cu118"
+    assert spec["python"] == "3.10" and spec["torch"] == "2.2.2+cu118"
     assert spec["spconv-cu118"] == "2.3.6" and spec["cumm-cu118"] == "0.4.11"
     assert "not yet verified" in spec["status"]
 

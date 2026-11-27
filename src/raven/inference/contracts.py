@@ -289,7 +289,7 @@ def validate_response_metadata(response, request):
         raise ValueError("worker recipe/Raven source mismatch")
     if (
         worker["packages"] != PACKAGES
-        or worker["python"] != "3.10.16"
+        or not (isinstance(worker["python"], str) and worker["python"].startswith("3.10."))
         or worker["cuda_runtime"] != "11.8"
     ):
         raise ValueError("worker dependency mismatch")

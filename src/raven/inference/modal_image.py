@@ -25,7 +25,7 @@ def build_image():
 
     # No weights/data in image layers. Only the explicitly named Raven source package is included.
     return (
-        modal.Image.from_registry(image_spec()["base"], add_python="3.10.16")
+        modal.Image.from_registry(image_spec()["base"], add_python="3.10")
         .apt_install("git", "build-essential", "ninja-build")
         .env(
             {

@@ -3,7 +3,7 @@
   "base": "nvidia/cuda@sha256:60eda04ab6790aa76d73bf0df245b361eabc6d8f7b6f6cf9846c70f399b9a1eb",
   "base_tag_at_resolution": "11.8.0-devel-ubuntu22.04",
   "architecture": "linux/amd64",
-  "python": "3.10.16",
+  "python": "3.10",
   "torch": "2.2.2+cu118",
   "spconv-cu118": "2.3.6",
   "cumm-cu118": "0.4.11",

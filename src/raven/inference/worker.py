@@ -61,7 +61,7 @@ class WorkerSession:
 
         packages = {name: importlib.metadata.version(name) for name in PACKAGES}
         if (
-            platform.python_version() != "3.10.16"
+            not platform.python_version().startswith("3.10.")
             or packages != PACKAGES
             or not torch.cuda.is_available()
             or torch.version.cuda != "11.8"
