@@ -17,7 +17,11 @@ raven studio
 ```
 
 `studio` installs PySide6-Essentials (Qt Widgets/Core/Gui/Test), without WebEngine or
-a separate web frontend. `visualization` supplies Open3D; `preprocessing` supplies
+a separate web frontend. Release 6.12.0 is excluded after the Linux/Python 3.11
+Studio job reproduced a binding-level `none_dealloc` abort, including after all
+30 tests passed. OpenUSD documents the same version-specific failure and uses
+6.11.2 in its [upstream CI](https://github.com/PixarAnimationStudios/OpenUSD/blob/dev/.github/workflows/buildusd.yml).
+Reinstall the Studio extra to resolve the compatible version in an existing environment. `visualization` supplies Open3D; `preprocessing` supplies
 SciPy for statistical outlier removal. Normal Raven installation, CLI commands and
 `raven studio --help` do not import Qt. Missing Qt yields an actionable installation
 error. No PyTorch, CUDA, OpenPCDet, weights or Modal installation is needed for
