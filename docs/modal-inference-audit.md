@@ -1,15 +1,16 @@
 # Modal dependency/startup audit — 2026-11-27
 
-This document preserves the initial dependency/startup audit and the subsequent
-response-serialization investigation. The initial audit was local/read-only. One
-separately authorized live attempt later completed genuine GPU inference but
-failed Raven client deserialization. The serialization repair is local-only and
-has not been deployed or validated with another GPU call. RV-049 remains open.
-See the [latest findings](#response-serialization-repair-and-offline-recovery).
+This document preserves the dependency/startup audit, response-serialization
+repair and final successful end-to-end evidence. The final smoke on commit
+`35e47ea007110b27913941e32b86f16b8bb34434` returned and persisted real GPU predictions;
+its artifacts independently pass offline finalization checks. See
+[final verification](#final-end-to-end-verification).
 
-The sections preceding those findings describe the initial audit and its proposed
-bounded live stage; they are historical evidence, not authorization for another
-attempt. No checkpoint bytes were read locally during either repair.
+Earlier sections describe their original audit phases and approval gates. Their
+failed/blocked outcomes remain historical evidence, not the final run's status or
+authorization for another attempt. Finalization performs no cloud operation and
+reads no checkpoint bytes. The original successful and failed artifacts remain
+unchanged.
 
 ## Actual failures and prioritized findings
 
@@ -164,7 +165,7 @@ the failed-run inventory, pinned-source checks, registry metadata, SDK graph che
 full test log and read-only preflight records. Existing failed output is never
 reused for a new run.
 
-## Next stage requires explicit approval
+## Historical next-stage approval gate
 
 Before an image build, deployment or GPU call, confirm fresh workspace budget and
 asset-use rights, original call termination and stopped app state. Retain the
@@ -299,3 +300,48 @@ serialization cases). Ruff, `pip check` and `git diff --check` pass. The only
 warning is the existing third-party Dash pytest deprecation. Cloud opt-in gates
 were disabled for the test run. CI results belong to their reported commit and
 must be checked separately from this local result.
+
+
+## Final end-to-end verification
+
+The progression is now complete for functional RV-049 acceptance:
+
+1. Initial image/dependency failures were followed by missing-torchvision and
+   repeated startup failures. They were preserved and diagnosed separately.
+2. The corrected dependency/native/configuration gate enabled the first genuine
+   T4 inference: 29 detections, but client `TorchVersion` deserialization failed.
+3. Commit `35e47ea007110b27913941e32b86f16b8bb34434` normalized framework values and
+   enforced recursive exact JSON-native responses, with 30 new regressions.
+4. Final experiment `modal-e2e-000000-20261127`, FunctionCall
+   `fc-01M8ETTKA3G3B4WJ66NC4D7F2T`, succeeded through the actual Raven client and
+   persistence layers: 1 succeeded, 0 failed; frame `000000`, train split,
+   115,384 raw points, no preprocessing, 29 detections (4 Car/19 Pedestrian/6 Cyclist).
+5. Finalization independently reran `verify-results --check-inputs
+   --replay-preprocessing`: `checks_passed`, integrity/source references/original
+   input/preprocessing replay/canonical train split verified, failures `[]`.
+   The complete request/response binding and all 29 headless overlay geometries
+   validate with GPU, GUI and Modal imports blocked. No inference is rerun.
+
+The persisted final worker records Tesla T4/capability 7.5, CUDA 11.8, Python
+3.10.13, Torch 2.2.2+cu118, torchvision 0.17.2+cu118, spconv-cu118 2.3.6,
+cumm-cu118 0.4.11 and the exact pinned OpenPCDet/config/checkpoint profile.
+Model initialization was 13.542388265 s, synchronized adapter detection
+0.765103602 s and client end-to-end 22.783332709 s. The latter excludes dataset
+loading and final persistence. Full identities/checksums, measurement boundaries
+and the acceptance evidence table are in the
+[final smoke record](modal-inference.md#verified-end-to-end-smoke--2026-11-27).
+
+These are one-frame smoke observations, not benchmarks, FPS, measured accuracy or
+AP_R40. Offline checks establish stored consistency/CPU replay; they do not prove
+cross-environment inference reproducibility or independently attest hardware.
+SDK-separated upload/download/queue phases remain unavailable, and repeated remote
+benchmarking is follow-up work. Legacy runtime modernization and checkpoint-loader
+security limitations remain explicit. No billable Modal operation, new deployment,
+model run, retry or Volume modification occurs during finalization. The operator's
+app-stop/no-container report is preserved as reported evidence, not a new account
+inspection.
+
+Finalization CPU validation: **1556 passed, 5 skipped**, 35.79 s, with the existing
+third-party Dash deprecation warning. Ruff, dependency and diff checks pass.
+The live opt-in test was disabled. No inference source code was changed for
+finalization; the final documentation commit requires its own green PR checks.

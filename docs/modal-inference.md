@@ -6,20 +6,19 @@ Local OpenPCDet and saved-baseline modes retain their schema-v1 behavior. Modal
 uses an explicit **experiment configuration schema v2**, request/response v1 and
 the existing prediction schema v1. Run artifacts remain run-schema-v1.
 
-**Validation status, 2026-11-27:** one genuine T4 inference completed on
-producer commit `e2b206d1e70f271d12b17f66ef13517d7965d70b`, returning 29 boxes
-(Car 4, Pedestrian 19, Cyclist 6) for KITTI frame `000000`. Raven then failed
-response deserialization because nested PyTorch version provenance contained a
-`torch.torch_version.TorchVersion` object. The native end-to-end run remains
-**failed**. The prior missing-torchvision/startup incident is separate historical
-evidence, retained unchanged.
+**Validation status, 2026-11-27:** the final experiment
+`modal-e2e-000000-20261127` completed the Raven → Modal → Tesla T4 → PointPillars →
+Raven path on commit `35e47ea007110b27913941e32b86f16b8bb34434`. Its persisted
+artifacts independently pass offline integrity, input and preprocessing-replay
+checks. The native client received and persisted 29 validated detections without
+Torch installed. See [final end-to-end evidence](#verified-end-to-end-smoke--2026-11-27).
 
-The local serialization repair converts framework version values to native
-strings and enforces exact JSON-native response types. It has CPU-only regression
-coverage, including a Torch-free subprocess and the client/persistence/export
-path. It has **not** been deployed or rerun on a GPU. No cloud operation is part
-of this repair; another live run requires separate explicit authorization.
-See [serialization and recovered-evidence findings](modal-inference-audit.md#response-serialization-repair-and-offline-recovery).
+Earlier dependency/startup failures and the first GPU call's client-deserialization
+failure remain separate preserved evidence. The JSON-native serialization repair
+has now been exercised by the final successful run. Finalization performs only
+local/offline checks and GitHub administration: no new cloud build, deployment,
+inference or other billable Modal operation. Future execution still requires
+explicit authorization and fresh preflight.
 
 ## Architecture and ownership
 
@@ -333,9 +332,9 @@ missing/wrong SDK, authentication/network/timeout failures, no automatic
 resubmission, cancellation failures, processed-input runner/evaluator integration,
 legacy mode regressions and imports without SDK/GPU/GUI dependencies. The pinned
 SDK accepted the app/image **definition locally without RPC**; this is not an
-image build. A real T4 build/boot/inference remains blocked by credentials,
-explicit chargeable-execution authorization, workspace budget verification and
-asset-use clearance. No new prediction count, accuracy or latency is reported.
+image build. Those initial CPU checks preceded the separately authorized real
+T4 runs documented below; they must not be presented as the GPU evidence. Future
+execution still requires fresh authorization, budget and asset-use checks.
 
 Troubleshooting: wrong source/recipe hash requires matching redeployment; GPU or
 package mismatch requires stopping and fixing the candidate image, not fallback;
@@ -457,12 +456,11 @@ checkpoint bytes were read, deserialized or uploaded. Sandbox `sysctl` queries
 printed permission diagnostics but did not prevent successful CPU/artifact checks.
 Reports and the smoke script remain ignored under `outputs/rv049-m5/`.
 
-#### Remaining live-validation requirements
+#### Historical live-validation requirements
 
-The separately approved attempt subsequently confirmed real GPU inference, but
-failed the CPU client's response deserialization. The local repair below needs a
-new separately authorized live end-to-end validation. Require fresh account,
-budget, asset-rights and original-call/app-state checks before any execution.
+The first approved GPU call failed client deserialization. The repair was then
+validated by the final successful end-to-end smoke below. Future executions still
+require fresh account, budget, asset-rights and original-call/app-state checks.
 No checkpoint or dataset is distributed with Raven. Accuracy, latency
 distributions and cross-environment numerical equivalence remain unverified.
 
@@ -540,7 +538,100 @@ client/persisted response validation are checked as well.
 The runtime source fingerprint now includes this boundary module. Historical
 records retain their original fingerprints and require their matching producer
 revision; current validators do not accept an arbitrary historical profile.
-The recovered incident response can be inspected offline as diagnostic evidence,
+The earlier failed-call response can be inspected offline as diagnostic evidence,
 with limitations described in the audit. It cannot be promoted into a successful
 experiment or completed-run export because the original request envelope was not
 saved. Never reconstruct that envelope or invent successful end-to-end timing.
+
+
+## Verified end-to-end smoke — 2026-11-27
+
+This records the completed experiment; none of the commands in this section
+submit inference. The six existing artifacts under
+`outputs/rv049/runs/modal-e2e-000000-20261127/` were inspected read-only and preserved:
+`modal.manifest.json`, `modal.config.json`, `modal.frames.txt`,
+`modal.provenance.json`, `modal.results.json` and `modal.started.json`.
+
+| Evidence | Recorded value |
+| --- | --- |
+| Experiment / split / frame | `modal-e2e-000000-20261127` / `train` / `000000` |
+| Native run result | `success`; succeeded 1, failed 0; failures `[]` |
+| Original / processed points | 115,384 / 115,384; no Raven preprocessing |
+| FunctionCall | `fc-01M8ETTKA3G3B4WJ66NC4D7F2T`; one recorded submission |
+| GPU / capability / CUDA | Tesla T4 / 7.5 / 11.8 |
+| Worker Python / PyTorch / torchvision | 3.10.13 / 2.2.2+cu118 / 0.17.2+cu118 |
+| spconv / cumm / NumPy | spconv-cu118 2.3.6 / cumm-cu118 0.4.11 / 1.26.4 |
+| OpenPCDet revision | `233f849829b6ac19afb8af8837a0246890908755` |
+| Model configuration | `tools/cfgs/kitti_models/pointpillar.yaml` |
+| Checkpoint loading | `pickle_loading_allowed: false`; no unsafe fallback |
+| Predictions | 29: Car 4, Pedestrian 19, Cyclist 6; `kitti_velodyne`, +Z yaw, geometric centers |
+| Model initialization | 13.542388265 s |
+| Synchronized adapter detection | 0.765103602 s |
+| Worker request | 0.771994348 s; excludes model initialization |
+| Client end-to-end | 22.783332709 s; excludes initial dataset loading and final artifact persistence |
+
+Identity checks retain the exact recorded hashes:
+
+- Original and processed XYZI SHA256:
+  `0e09c85e3f6078ecbdd1e706ee9624519f1bd29417437167a9ed7fbe6f54b4b1`.
+- Experiment configuration SHA256:
+  `ce75a73995f26a8996a8439f0c9eb0b378569806edcade4a7b23394b6c0318d8`.
+- Checkpoint SHA256:
+  `4c83fc0fa02575b9b3e9dec676f698e7a70bb5a795e89f91df8a96b916fa19e2`.
+- Model YAML SHA256:
+  `170a9ffe76cfd8509d1044cfbcf1cbd44c5d320fda81bf0089a8d5efaf1c91c8`.
+- Base YAML SHA256:
+  `a6c44a7b0f15b94e135946cecbd8b5541906a69d37811705e9884a411e7b1797`.
+- Worker source SHA256:
+  `c1d588a3984caac75081b7ab6c3b2ac3fc22755582ce7e6c98123ee7a9d81531`.
+- Response SHA256:
+  `98af6dc49e288a5bc889b9164ce03a34bf5d8938ce15a4eefc9569965df257b8`.
+
+Finalization independently reran the following offline command with cloud opt-ins
+disabled:
+
+```bash
+raven verify-results \
+  outputs/rv049/runs/modal-e2e-000000-20261127/modal.manifest.json \
+  --check-inputs --replay-preprocessing
+```
+
+Result: `status: checks_passed`, `artifact_integrity: verified`,
+`original_source_references: verified`, `original_input_integrity: verified`,
+`preprocessing_replay: verified`, canonical `train` split verified, failures `[]`.
+The full original request, response and processed-cloud binding validate with the
+unchanged production validator. All 29 boxes also pass headless overlay-corner
+construction in Velodyne coordinates with GPU/GUI/Modal imports blocked. This
+confirms saved-geometry compatibility, not graphical rendering or AP evaluation.
+
+The original failed runs and recovered diagnostic archive retain their original
+status and fingerprints. They were not overwritten or promoted into this run.
+The operator reports the app was stopped with no running containers after the
+successful inference; finalization does not query or restart Modal or delete the
+private checkpoint Volume.
+
+### Acceptance evidence and remaining research limits
+
+| RV-049 acceptance criterion | Evidence |
+| --- | --- |
+| Configured MacBook CLI receives/persists genuine GPU predictions | Successful native schema-v2 run and complete validated envelope above; client provenance records Torch absent |
+| Local/saved paths remain functional | Full CPU regression suite covers legacy sources; no replacement inference backend |
+| Traceable inputs/model/backend/outputs | Config, input, request, response, model/config/checkpoint and worker fingerprints validate |
+| Safe failures and invalid-data handling | Preserved earlier failures, strict negative contract/startup/transport/cache tests; no fabricated success or automatic resubmission |
+| Optional, bounded execution without committed credentials/weights | Explicit two-gate opt-in, fixed resource/timeout bounds, private existing Volume, reviewed diff |
+| CPU tests, Ruff, CI and separate real smoke | CPU/CI results reported on PR #77; genuine run identified above |
+| M5 integration and independent future V2V | Existing runner/evaluation/export/verification boundaries; provider-neutral transport and metadata-only vehicle/pose extension points |
+
+One KITTI **training** frame is a functional smoke test. Twenty-nine predictions
+are not twenty-nine verified correct detections. Real KITTI AP_R40 has not been
+established. Offline verification checks stored consistency and CPU preprocessing;
+it neither reruns GPU inference nor independently attests execution origin.
+Cross-environment reproducibility has not been demonstrated.
+
+The timings are one observation, not latency distributions, production steady-state
+latency, FPS or accuracy evidence. Separate upload/download/queue durations remain
+explicitly unavailable in the SDK; no inferred values are substituted. Precise
+remote timing instrumentation and repeated experiments remain follow-up work;
+RV-033's existing local-CUDA benchmark must not be relabeled a remote benchmark.
+Legacy Torch 2.2.2/Python 3.10 modernization remains separate, and the documented
+checkpoint-loader security limitations and asset-use restrictions still apply.

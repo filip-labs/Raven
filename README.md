@@ -376,7 +376,9 @@ a provider-neutral remote detector, with processed-input hashes, strict validate
 predictions and provenance compatible with KITTI evaluation. Local/saved v1 modes
 remain available. See the [Modal setup, spending controls and validation status](docs/modal-inference.md)
 and `configs/experiments/modal-pointpillars.json`. Cloud execution is opt-in; the
-candidate container has not yet been built or validated on Modal GPU hardware.
+final frame-000000 smoke completed genuine Tesla T4 inference and persisted 29
+validated detections; offline integrity/input/preprocessing checks passed. This
+one-frame training smoke establishes no accuracy or latency benchmark.
 Modal artifacts integrate with results export and bounded CPU reproducibility
 checks; synthetic remote records remain labeled synthetic and do not yield GPU
 accuracy claims. Repeated remote benchmarking remains separate from local CUDA.

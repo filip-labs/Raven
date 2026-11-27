@@ -239,8 +239,10 @@ The optional [Modal profile](modal-inference.md) uses a separate reviewed Python
 3.10.x / Torch 2.2.2+cu118 / torchvision 0.17.2+cu118 environment. It does not change
 the historical Kaggle environment or install GPU packages into normal Raven.
 The corrected candidate must pass its CPU image import/native/config checks before
-an authorized GPU smoke. Actual Modal checkpoint loading and CUDA forward remain
-unverified until that smoke succeeds.
+an authorized GPU smoke. The final Modal frame-000000 smoke on `35e47ea`
+successfully loaded the pinned checkpoint and executed CUDA inference, returning
+29 validated detections through Raven. See the [recorded evidence and limits](modal-inference.md#verified-end-to-end-smoke--2026-11-27); no new GPU call is
+part of finalization.
 
 At the pinned upstream revision, `pcdet/__init__.py` checks for `.git` adjacent to
 its source, then runs `git rev-parse HEAD` in the process's current directory.
