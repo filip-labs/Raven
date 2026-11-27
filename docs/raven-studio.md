@@ -161,7 +161,7 @@ and runs offscreen integration. Its Linux runner installs the EGL/OpenGL loader
 libraries required to import Qt; no CUDA or NVIDIA runtime is installed. No test
 requires a GPU, credentials or KITTI data.
 
-Actual macOS validation during implementation:
+Initial agent-observed macOS validation during MVP implementation:
 
 | Check | Observed result |
 | --- | --- |
@@ -174,11 +174,36 @@ Actual macOS validation during implementation:
 | Saved prediction + GT launcher | Genuine run revalidated and temporary document passed to the existing CLI viewer |
 | Interactive Open3D camera/overlay appearance and Shift+F12 PNG | Still require direct operator confirmation; automation could not select the separate Python renderer window reliably |
 
-The last row is not claimed as visually verified. Before presenting, directly
-confirm raw/GT display, comparison camera synchronization, saved-box alignment,
-controls and rendered screenshot export on the demonstration Mac. Keep RV-050
-open until that complete acceptance demo is confirmed. Generated GUI screenshots
-and private run/data artifacts remain local and untracked.
+The last row records the initial automation limitation. The owner subsequently
+reported the working MVP as manually validated before requesting the polish pass;
+that report is distinct from the agent's observations above. RV-050 and PR #82
+remain open for review. Generated GUI screenshots and private run/data artifacts
+remain local and untracked.
+
+### UI refinement validation
+
+The centralized theme retains the Heimdall palette. A small Qt proxy style paints
+20 px rounded checkbox indicators (including stage-list checks) with checked,
+unchecked, disabled, hover and keyboard-focus states. Native Qt input behavior is
+retained. Combo boxes use a painted chevron; scrollbars have thin rounded thumbs
+and no arrow buttons. Buttons use consistent padding with compact action widths.
+
+Results separates total detections, individual class counts, experiment status
+and recorded timings into readable blocks. Values still come from the existing
+validated summary API; missing measurements stay unavailable and synthetic evidence
+is labeled. Long source paths elide in the middle with the full path accessible
+through a tooltip and accessibility name. Provenance remains expandable.
+
+During the refinement pass, the native macOS app was relaunched and visually
+inspected with the genuine saved RV-049 results: 29 detections, Car 4, Pedestrian 19,
+Cyclist 6, and unchanged recorded timing values. A genuine native screenshot was
+saved locally. Offscreen Qt layout checks also covered 1120 × 800 and 880 × 640
+windows, checked controls and expanded provenance. These are widget/layout checks,
+not fresh Open3D rendering validation. The automation bridge timed out during a
+follow-up native interaction check. Regression tests cover checkbox mouse/keyboard
+behavior, combo selection, readouts, loading failures and narrow-window overflow.
+Narrow/short windows still require vertical scrolling to reach all actions; native
+file pickers keep their platform appearance. No backend or renderer was changed.
 
 Deferred: embedded viewport, broad experiment editor/execution, cloud management,
 remote benchmarks, dark theme and signed application packaging. These are not

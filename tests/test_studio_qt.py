@@ -243,3 +243,86 @@ def test_accessible_parameter_change_invalidates_previous_comparison(window, app
     assert window.processed is not None
     window.parameter_fields["voxel_size"][0][0].setText(".4")
     assert window.processed is None and not window.compare_button.isEnabled()
+
+
+def test_refined_readouts_preserve_counts_timings_and_synthetic_label(window, app, remote):
+    from copy import deepcopy
+
+    config, _ = remote
+    window.open_run(execute(config))
+    wait(app, lambda: window.task is None)
+    before = deepcopy(window.saved.frames)
+    assert window.result_classes.counts == {"Car": 1}
+    assert window.result_classes.readouts["Car"].value.text() == "1"
+    assert window.result_timings["initialization"].value.text() == "2.000000 s"
+    assert window.result_status.text() == "Synthetic evidence"
+    window._show_result("000001")
+    assert window.saved.frames == before
+    window.open_run(config.run_directory / "missing.json")
+    wait(app, lambda: window.task is None)
+    assert not window.result_classes.counts
+    assert window.result_status.text() == "Not loaded"
+    assert all(m.value.text() == "Unavailable" for m in window.result_timings.values())
+
+
+def test_class_readouts_include_every_class_and_distinguish_empty_from_unloaded(app):
+    from raven.studio.widgets import ClassCounts
+
+    w = ClassCounts()
+    w.set_counts({"Cyclist": 6, "Pedestrian": 19, "Car": 4, "Other": 2})
+    assert list(w.readouts) == ["Car", "Pedestrian", "Cyclist", "Other"]
+    assert [v.value.text() for v in w.readouts.values()] == ["4", "19", "6", "2"]
+    w.set_counts({})
+    assert not w.readouts and not w.counts
+    w.clear()
+    assert not w.readouts
+    w.close()
+
+
+def test_refined_controls_keep_native_mouse_keyboard_and_clean_rendering(app):
+    from PySide6.QtCore import QPoint, Qt, qInstallMessageHandler
+    from PySide6.QtWidgets import QCheckBox, QStyle
+
+    from raven.studio.widgets import ComboBox
+
+    warnings = []
+    previous = qInstallMessageHandler(lambda kind, context, message: warnings.append(message))
+    check = QCheckBox("Ground truth")
+    combo = ComboBox()
+    try:
+        apply_theme(app)
+        check.show()
+        check.setFocus()
+        app.processEvents()
+        assert check.style().pixelMetric(QStyle.PixelMetric.PM_IndicatorWidth) == 20
+        QTest.mouseClick(check, Qt.MouseButton.LeftButton, pos=QPoint(10, check.height() // 2))
+        assert check.isChecked()
+        QTest.keyClick(check, Qt.Key.Key_Space)
+        assert not check.isChecked()
+        for enabled in [True, False]:
+            check.setEnabled(enabled)
+            for checked in [True, False]:
+                check.setChecked(checked)
+                assert not check.grab().isNull()
+        combo.addItems(["distance", "intensity", "uniform"])
+        combo.show()
+        combo.setFocus()
+        QTest.keyClick(combo, Qt.Key.Key_Down)
+        assert combo.currentText() == "intensity"
+        assert not combo.grab().isNull()
+        assert not any("Unknown color" in m or "Could not parse" in m for m in warnings), warnings
+    finally:
+        check.close()
+        combo.close()
+        qInstallMessageHandler(previous)
+
+
+def test_long_paths_do_not_force_horizontal_overflow_at_small_window(window, app, remote):
+    config, _ = remote
+    window.resize(880, 640)
+    window.open_run(execute(config))
+    wait(app, lambda: window.task is None)
+    window.navigate(2)
+    app.processEvents()
+    assert window.pages.currentWidget().horizontalScrollBar().maximum() == 0
+    assert window.result_path.toolTip() == str(window.saved.run.manifest_path)

@@ -9,7 +9,6 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
@@ -26,6 +25,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -49,6 +49,7 @@ from raven.studio.services import (
 from raven.studio.state import PipelineEditor
 from raven.studio.tasks import Task, ViewerProcess
 from raven.studio.theme import TOKENS
+from raven.studio.widgets import ClassCounts, ComboBox, PathLabel, Readout
 
 
 def label(text="", name=None):
@@ -65,6 +66,7 @@ def button(text, callback, primary=False):
     widget = QPushButton(text)
     widget.setObjectName("action_" + re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_"))
     widget.setProperty("tone", "primary" if primary else "secondary")
+    widget.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
     widget.clicked.connect(callback)
     return widget
 
@@ -73,7 +75,9 @@ def row(*widgets):
     layout = QHBoxLayout()
     layout.setSpacing(10)
     for widget in widgets:
-        layout.addWidget(widget)
+        layout.addWidget(widget, 1 if isinstance(widget, (QLabel, QLineEdit)) else 0)
+    if all(isinstance(widget, QPushButton) for widget in widgets):
+        layout.addStretch()
     return layout
 
 
@@ -82,7 +86,7 @@ def panel():
     widget.setObjectName("panel")
     layout = QVBoxLayout(widget)
     layout.setContentsMargins(24, 24, 24, 24)
-    layout.setSpacing(16)
+    layout.setSpacing(14)
     return widget, layout
 
 
@@ -121,7 +125,7 @@ class MainWindow(QMainWindow):
         nav.setContentsMargins(16, 28, 16, 24)
         nav.setSpacing(10)
         nav.addWidget(label("RAVEN", "brand"))
-        nav.addWidget(label("STUDIO  /  VISION"))
+        nav.addWidget(label("STUDIO  /  VISION", "sidebar_caption"))
         nav.addSpacing(35)
         self.nav_buttons = []
         for i, title in enumerate(["Dataset", "Processing", "Results"]):
@@ -206,7 +210,7 @@ class MainWindow(QMainWindow):
         self.dataset_path.setReadOnly(True)
         self.dataset_path.setPlaceholderText("No dataset selected")
         self.dataset_path.setAccessibleName("KITTI dataset root")
-        self.split = QComboBox()
+        self.split = ComboBox()
         self.split.addItems(["train", "val", "test"])
         self.split.setAccessibleName("Dataset split")
         self.split.currentTextChanged.connect(self._change_split)
@@ -245,7 +249,7 @@ class MainWindow(QMainWindow):
         details.addStretch()
         self.gt = QCheckBox("Ground-truth boxes")
         details.addWidget(self.gt)
-        self.color = QComboBox()
+        self.color = ComboBox()
         self.color.addItems(["distance", "intensity", "uniform"])
         self.color.setAccessibleName("Point color")
         self.point_size = QDoubleSpinBox()
@@ -272,7 +276,7 @@ class MainWindow(QMainWindow):
         )
         self.processing_source = label("Select a frame in Dataset first.", "muted")
         layout.addWidget(self.processing_source)
-        self.stage_type = QComboBox()
+        self.stage_type = ComboBox()
         self.stage_type.addItems(list(STAGES))
         self.stage_type.setAccessibleName("New processing stage")
         layout.addLayout(
@@ -333,7 +337,7 @@ class MainWindow(QMainWindow):
         widget, layout = self._page(
             "Inspect the evidence", "Saved results, validated locally. No inference is launched."
         )
-        self.result_path = label("No experiment open", "muted")
+        self.result_path = PathLabel("No experiment open")
         layout.addLayout(
             row(
                 button("Open Manifest", self.choose_run, True),
@@ -341,21 +345,34 @@ class MainWindow(QMainWindow):
             )
         )
         layout.addWidget(self.result_path)
-        self.result_frames = QComboBox()
+        self.result_frames = ComboBox()
         self.result_frames.setAccessibleName("Saved experiment frame")
         self.result_frames.currentTextChanged.connect(self._show_result)
         layout.addWidget(self.result_frames)
         card, body = panel()
-        self.result_title = label("Your results stay local", "title")
+        self.result_title = label("Your results stay local", "section_title")
+        self.result_status = label("No run open", "result_status")
+        self.result_status.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         self.result_count = label("—", "hero")
-        self.result_classes = label(
-            "Open a completed Raven run to inspect its saved detections.", "muted"
-        )
+        self.result_classes = ClassCounts()
         self.result_summary = label("Missing measurements are shown as unavailable.", "muted")
-        body.addWidget(self.result_title)
+        body.addLayout(row(self.result_title, self.result_status))
         body.addWidget(self.result_count)
         body.addWidget(self.result_classes)
         body.addWidget(self.result_summary)
+        self.result_timings = {}
+        timing_row = QHBoxLayout()
+        timing_row.setSpacing(10)
+        for key, title in (
+            ("initialization", "Model initialization"),
+            ("detection", "GPU detection"),
+            ("end_to_end", "Client end-to-end"),
+        ):
+            metric = Readout(title, compact=True)
+            metric.set_value("Unavailable")
+            self.result_timings[key] = metric
+            timing_row.addWidget(metric, 1)
+        body.addLayout(timing_row)
         body.addStretch()
         self.result_gt = QCheckBox("Include matching ground truth, when available")
         body.addWidget(self.result_gt)
@@ -375,13 +392,17 @@ class MainWindow(QMainWindow):
             "Verification checks saved consistency; it does not repeat GPU inference.", "muted"
         )
         layout.addWidget(self.verification_label)
-        self.provenance_group = QGroupBox("Provenance & measurement boundaries")
+        self.provenance_group = QGroupBox("Provenance · measurement boundaries")
         self.provenance_group.setCheckable(True)
         self.provenance_group.setChecked(False)
         provenance_layout = QVBoxLayout(self.provenance_group)
         self.provenance_text = label("", "muted")
         self.provenance_text.hide()
+        self.provenance_group.setMaximumHeight(48)
         self.provenance_group.toggled.connect(self.provenance_text.setVisible)
+        self.provenance_group.toggled.connect(
+            lambda expanded: self.provenance_group.setMaximumHeight(16777215 if expanded else 48)
+        )
         provenance_layout.addWidget(self.provenance_text)
         layout.addWidget(self.provenance_group)
         return widget
@@ -425,6 +446,9 @@ class MainWindow(QMainWindow):
             self._maybe_close()
             return
         if self._job_error:
+            if self._job_callback == self._run_loaded:
+                self.result_title.setText("No experiment loaded")
+                self.result_status.setText("Not loaded")
             self.error(self._job_error)
         else:
             try:
@@ -811,7 +835,12 @@ class MainWindow(QMainWindow):
         self.saved = None
         self.result_title.setText("Opening saved evidence…")
         self.result_count.setText("—")
-        self.result_classes.setText("")
+        self.result_classes.clear()
+        self.result_status.setText("Opening…")
+        self.result_status.setProperty("state", "neutral")
+        self.result_status.style().polish(self.result_status)
+        for metric in self.result_timings.values():
+            metric.set_value("Unavailable")
         self.result_summary.setText("")
         self.provenance_text.setText("")
         self.prediction_button.setEnabled(False)
@@ -843,12 +872,19 @@ class MainWindow(QMainWindow):
         summary = summarize_result(self.saved, frame_id)
         self.result_title.setText(summary["experiment"])
         self.result_count.setText(f"{summary['detections']:,} detections")
-        self.result_classes.setText(
-            "  ·  ".join(f"{key}  {value}" for key, value in summary["classes"].items())
-            or "No detections"
+        self.result_classes.set_counts(summary["classes"])
+        synthetic = summary["evidence"] == "synthetic_test"
+        self.result_status.setText(
+            "Synthetic evidence" if synthetic else summary["status"].capitalize()
         )
+        self.result_status.setProperty("state", "synthetic" if synthetic else "success")
+        self.result_status.style().polish(self.result_status)
+        for key, metric in self.result_timings.items():
+            metric.set_value(seconds(summary[key]))
         self.result_summary.setText(
-            f"{summary['status'].upper()}  ·  {summary['model']} / {summary['backend']}  ·  {summary['gpu'] or 'GPU unavailable'}\nEvidence: {summary['evidence']}\nFrame {frame_id} · split {summary['split']}\n\nModel initialization  {seconds(summary['initialization'])}\nSynchronized detection  {seconds(summary['detection'])}\nClient end-to-end  {seconds(summary['end_to_end'])}\n\nPreprocessing  {', '.join(summary['preprocessing']) or 'None (raw baseline)'}"
+            f"{summary['model']} / {summary['backend']}  ·  {summary['gpu'] or 'GPU unavailable'}  ·  Frame {frame_id} / {summary['split']}\n"
+            f"Evidence: {summary['evidence']}\n"
+            f"Preprocessing: {', '.join(summary['preprocessing']) or 'None (raw baseline)'}"
         )
         self.provenance_text.setText(
             f"Model: {summary['model']}\nOpenPCDet: {summary['model_identity'].get('openpcdet_revision', 'Unavailable')}\nCheckpoint SHA256: {summary['model_identity'].get('checkpoint_sha256', 'Unavailable')}\nEvidence kind: {summary['evidence']}\nDataset: {summary['dataset']}\nConfiguration SHA256: {summary['config_sha256']}\n\nSingle-frame timings are observations, not statistical benchmarks or FPS. Client end-to-end excludes loading/persistence. Detection time includes adapter preparation/transfers/postprocessing. Counts do not establish accuracy. Stored hashes establish consistency, not hardware attestation."
