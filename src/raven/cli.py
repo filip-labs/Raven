@@ -42,6 +42,7 @@ def _config_constant(value):
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="raven", description="Raven Vision CLI")
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("studio", help="Open the optional native Raven Studio desktop workbench")
     inspect = sub.add_parser("inspect", help="Read and summarize a KITTI LiDAR .bin frame")
     inspect.add_argument("path", help="Path to KITTI velodyne/000000.bin")
     labels = sub.add_parser("inspect-labels", help="Summarize KITTI label_2 annotations as JSON")
@@ -166,6 +167,10 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "Navigation uses frame-matched sibling labels/calib and --predictions-dir; explicit single-frame files are unsupported"
             )
     try:
+        if args.command == "studio":
+            from raven.studio.app import launch
+
+            raise SystemExit(launch())
         if args.command == "verify-results":
             from raven.experiments.artifacts import write_json_exclusive
             from raven.reproducibility.verify import verify_results

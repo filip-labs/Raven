@@ -2,6 +2,21 @@
 
 Raven is a modular cooperative LiDAR perception research project for connected vehicles. Its long-term direction combines deep learning, sensor fusion, and distributed communication.
 
+## Raven Studio desktop workbench
+
+Use the optional native desktop UI to browse KITTI frames, configure CPU processing,
+open existing Open3D viewers and inspect/verify saved PointPillars experiment results.
+It never runs inference or cloud jobs. The light interface follows Heimdall's design
+language; Open3D opens in separate managed windows.
+
+```bash
+python -m pip install -e ".[dev,studio,visualization,preprocessing]"
+raven studio
+```
+
+See the [Studio guide and macOS demo checklist](docs/raven-studio.md) for the
+Dataset → Processing → Results workflow, screenshot controls and validation limits.
+
 ## Current phase: Raven Vision
 
 Phase 1 supports the academic module *Napredni inteligentni sistemi* (Advanced Intelligent Systems). The current Python starter implements:

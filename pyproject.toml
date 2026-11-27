@@ -16,6 +16,7 @@ preprocessing = ["scipy>=1.10,<2"]
 dev = ["pytest>=8", "ruff>=0.6", "scipy>=1.10,<2", "shapely==2.1.2"]
 evaluation = ["shapely==2.1.2"]
 modal = ["modal==1.6.4"]
+studio = ["PySide6-Essentials>=6.8,<7"]
 
 [project.scripts]
 raven = "raven.cli:main"
