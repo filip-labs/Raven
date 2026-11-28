@@ -55,6 +55,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         "inspect-experiment", help="Validate experiment JSON and inspect identity/frame selection"
     )
     experiment.add_argument("path", help="Path to a schema-v1 or schema-v2 experiment JSON configuration")
+    baseline = sub.add_parser("prepare-baseline", help="Prepare one bounded M6 baseline plan offline")
+    baseline.add_argument("template", help="Existing schema-v2 Modal experiment template")
+    baseline.add_argument("--dataset-root", required=True)
+    baseline.add_argument("--output-directory", required=True, help="Future run output root")
+    baseline.add_argument("--experiment-id", required=True, help="New unique run identifier")
+    baseline.add_argument("--plan-directory", required=True, help="New exclusive planning directory")
+    baseline.add_argument("--frame-count", type=int, choices=range(1, 9), default=1)
+    baseline.add_argument("--inspect-subset", action="store_true", help="Read all 256 frozen inputs offline")
     run = sub.add_parser("run-experiment", help="Preflight and execute a schema-v1 or schema-v2 experiment")
     run.add_argument("path", help="Path to experiment JSON")
     run.add_argument("--dry-run", action="store_true", help="Preflight only; create no artifacts")
@@ -167,6 +175,20 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "Navigation uses frame-matched sibling labels/calib and --predictions-dir; explicit single-frame files are unsupported"
             )
     try:
+        if args.command == "prepare-baseline":
+            from raven.research.baseline import prepare_baseline
+
+            result = prepare_baseline(
+                args.template, dataset_root=args.dataset_root,
+                output_directory=args.output_directory, experiment_id=args.experiment_id,
+                plan_directory=args.plan_directory, frame_count=args.frame_count,
+                inspect_subset=args.inspect_subset,
+            )
+            print(json.dumps(result, indent=2, allow_nan=False))
+            # A plan is persisted for review even if evaluation input readiness is blocked.
+            if result["evaluation_readiness"] == "blocked_inputs" or result["runner_preflight_status"] != "ready":
+                parser.exit(3, "Baseline preflight is blocked; see planning report.\n")
+            return
         if args.command == "studio":
             from raven.studio.app import launch
 

@@ -1,0 +1,28 @@
+{
+  "selection_version": 1,
+  "purpose": "frozen_validation_subset_not_measurements",
+  "canonical_count": 3769,
+  "split": {
+    "status": "verified",
+    "split": "val",
+    "manifest_sha256": "657ac4bcc1e156e5b106a4ca18e1f88e012787ea1d2b5d0adeea97fee903fa86",
+    "source_url": "https://raw.githubusercontent.com/open-mmlab/OpenPCDet/233f849829b6ac19afb8af8837a0246890908755/data/kitti/ImageSets/val.txt",
+    "upstream_commit": "233f849829b6ac19afb8af8837a0246890908755",
+    "metadata_sha256": "3a71d7db6d7d49600ce568444ff1f49e022687963f4737ef37c1f6db144dce3c"
+  },
+  "seed": 42,
+  "algorithm": "PCG64.choice-without-replacement/input-order/v1",
+  "candidate_order": "ascending-six-digit-ID",
+  "numpy_version_at_selection": "2.4.6",
+  "count": 256,
+  "manifest_sha256": "1e974d53fd9a93f3ad0cef16d1d1b5bfc02f21461a098b2ee0236449c44727a1",
+  "model": {
+    "name": "pointpillars",
+    "openpcdet_revision": "233f849829b6ac19afb8af8837a0246890908755",
+    "checkpoint_sha256": "4c83fc0fa02575b9b3e9dec676f698e7a70bb5a795e89f91df8a96b916fa19e2",
+    "config_sha256": "170a9ffe76cfd8509d1044cfbcf1cbd44c5d320fda81bf0089a8d5efaf1c91c8",
+    "base_config_sha256": "a6c44a7b0f15b94e135946cecbd8b5541906a69d37811705e9884a411e7b1797"
+  },
+  "preprocessing": [],
+  "preprocessing_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+}

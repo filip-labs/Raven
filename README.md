@@ -422,3 +422,12 @@ scope. Add `--compare OTHER` for scientific comparisons or
 `--replay-preprocessing` for bounded CPU replay. See the
 [reproducibility contract, retention rules and real KITTI evidence](docs/experiment-reproducibility.md).
 No GPU inference is performed by verification.
+
+## M6 baseline research preparation (RV-036)
+
+`raven prepare-baseline` prepares one bounded schema-v2 raw PointPillars validation
+plan, with a frozen seed-42 256-frame research subset and read-only evaluation-input
+checks. It performs no cloud operations. See the [baseline protocol](docs/m6-baseline-protocol.md)
+for exact IDs/hashes, CLI usage, actual input availability, rights/cost controls
+and staged approvals. Baseline AP_R40 remains pending; historical `train/000000`
+inference is not validation evidence.
